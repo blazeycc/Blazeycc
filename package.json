@@ -1,5 +1,5 @@
 {
-  "name": "glimpse",
+  "name": "glimse",
   "version": "1.0.0",
   "description": "Record any website as video",
   "main": "main.js",
@@ -19,10 +19,10 @@
     "name": "theKennethy",
     "email": "thekennethy@github.com"
   },
-  "homepage": "https://github.com/theKennethy/glimpse",
+  "homepage": "https://github.com/theKennethy/glimse",
   "repository": {
     "type": "git",
-    "url": "https://github.com/theKennethy/glimpse.git"
+    "url": "https://github.com/theKennethy/glimse.git"
   },
   "license": "GPL-3.0",
   "devDependencies": {
@@ -30,8 +30,8 @@
     "electron-builder": "^26.8.1"
   },
   "build": {
-    "appId": "com.thekennethy.glimpse",
-    "productName": "Glimpse",
+    "appId": "com.thekennethy.glimse",
+    "productName": "Glimse",
     "asar": true,
     "asarUnpack": [
       "node_modules/ffmpeg-static/**/*"

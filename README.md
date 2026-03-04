@@ -1,4 +1,4 @@
-# Glimpse
+# Glimse
 
 **Record any website as video** - Capture demos, tutorials, and presentations as high-quality MP4, WebM, or GIF.
 
@@ -19,10 +19,10 @@
 
 Download the latest release for your platform:
 
-- **Windows**: [glimpse-setup-1.0.0.exe](https://github.com/theKennethy/glimpse/releases/latest)
-- **Linux AppImage**: [glimpse-1.0.0.AppImage](https://github.com/theKennethy/glimpse/releases/latest)
-- **Linux .deb**: [glimpse_1.0.0_amd64.deb](https://github.com/theKennethy/glimpse/releases/latest)
-- **Linux .rpm**: [glimpse-1.0.0.x86_64.rpm](https://github.com/theKennethy/glimpse/releases/latest)
+- **Windows**: [glimse-setup-1.0.0.exe](https://github.com/theKennethy/glimse/releases/latest)
+- **Linux AppImage**: [glimse-1.0.0.AppImage](https://github.com/theKennethy/glimse/releases/latest)
+- **Linux .deb**: [glimse_1.0.0_amd64.deb](https://github.com/theKennethy/glimse/releases/latest)
+- **Linux .rpm**: [glimse-1.0.0.x86_64.rpm](https://github.com/theKennethy/glimse/releases/latest)
 
 ## Development
 
