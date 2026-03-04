@@ -2,7 +2,7 @@
 
 **Record any website as video** - Capture demos, tutorials, and presentations as high-quality MP4, WebM, or GIF.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)
 
 ## Features
@@ -48,4 +48,4 @@ npm run build:win
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+GPL-3.0 License - see [LICENSE](LICENSE) for details.
