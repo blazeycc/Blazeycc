@@ -6,8 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getWebviewSource: (webviewId) => ipcRenderer.invoke('get-webview-source', webviewId),
     
     // Save video file (with MP4/GIF conversion and optional resize)
-    saveVideo: (filename, data, format = 'mp4', quality = 'high', width = null, height = null) => 
-        ipcRenderer.invoke('save-video', { filename, data, format, quality, width, height }),
+    saveVideo: (filename, data, format = 'mp4', quality = 'high', width = null, height = null, proSettings = null) => 
+        ipcRenderer.invoke('save-video', { filename, data, format, quality, width, height, proSettings }),
     
     // Bookmarks
     getBookmarks: () => ipcRenderer.invoke('get-bookmarks'),
@@ -37,6 +37,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setLicense: (email, key) => ipcRenderer.invoke('set-license', { email, key }),
     validateLicense: (email, key) => ipcRenderer.invoke('validate-license', { email, key }),
     clearLicense: () => ipcRenderer.invoke('clear-license'),
+    isProLicensed: () => ipcRenderer.invoke('is-pro-licensed'),
+    
+    // Batch recordings (Pro)
+    getBatchUrls: () => ipcRenderer.invoke('get-batch-urls'),
+    setBatchUrls: (urls) => ipcRenderer.invoke('set-batch-urls', urls),
+    
+    // Scheduled recordings (Pro)
+    getScheduledRecordings: () => ipcRenderer.invoke('get-scheduled-recordings'),
+    addScheduledRecording: (schedule) => ipcRenderer.invoke('add-scheduled-recording', schedule),
+    removeScheduledRecording: (id) => ipcRenderer.invoke('remove-scheduled-recording', id),
+    
+    // Custom watermark (Pro)
+    getCustomWatermark: () => ipcRenderer.invoke('get-custom-watermark'),
+    setCustomWatermark: (settings) => ipcRenderer.invoke('set-custom-watermark', settings),
+    selectWatermarkImage: () => ipcRenderer.invoke('select-watermark-image'),
+    
+    // Fast encoding (Pro)
+    getFastEncode: () => ipcRenderer.invoke('get-fast-encode'),
+    setFastEncode: (enabled) => ipcRenderer.invoke('set-fast-encode', enabled),
+    
+    // Cloud sync (Pro)
+    getCloudConfig: () => ipcRenderer.invoke('get-cloud-config'),
+    setCloudConfig: (config) => ipcRenderer.invoke('set-cloud-config', config),
+    openExternal: (url) => ipcRenderer.invoke('open-external', url),
     
     // FFmpeg progress listener
     onFFmpegProgress: (callback) => {

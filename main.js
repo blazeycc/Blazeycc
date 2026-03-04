@@ -5,6 +5,33 @@ const os = require('os');
 const ffmpeg = require('fluent-ffmpeg');
 const Store = require('electron-store').default || require('electron-store');
 
+// Get watermark logo path
+function getWatermarkLogoPath() {
+    if (app.isPackaged) {
+        const logoPath = path.join(process.resourcesPath, 'watermark.png');
+        if (fs.existsSync(logoPath)) {
+            return logoPath;
+        }
+    }
+    // Dev mode - use local file
+    const devPath = path.join(__dirname, 'blazeycc-logo.png');
+    if (fs.existsSync(devPath)) {
+        return devPath;
+    }
+    return null;
+}
+
+// Get watermark position coordinates
+function getWatermarkPosition(position) {
+    const positions = {
+        'bottom-left': { x: '10', y: 'h-35' },
+        'bottom-right': { x: 'w-tw-10', y: 'h-35' },
+        'top-left': { x: '10', y: '10' },
+        'top-right': { x: 'w-tw-10', y: '10' }
+    };
+    return positions[position] || positions['bottom-left'];
+}
+
 // Get ffmpeg path - handle both dev and packaged scenarios
 function getFFmpegPath() {
     let ffmpegPath;
@@ -157,7 +184,17 @@ ipcMain.handle('get-webview-source', async (event, webviewId) => {
 });
 
 // Save video file (with MP4/GIF conversion and resize)
-ipcMain.handle('save-video', async (event, { filename, data, format, quality, width, height }) => {
+ipcMain.handle('save-video', async (event, { filename, data, format, quality, width, height, proSettings }) => {
+    // Check if Pro licensed
+    const license = store.get('license', null);
+    const isProLicensed = license && license.email && license.key && validateLicenseKey(license.email, license.key);
+    
+    // Pro settings defaults
+    const settings = proSettings || {};
+    const useFastEncode = isProLicensed && settings.fastEncode;
+    const customWatermark = isProLicensed && settings.customWatermark;
+    const shouldAddWatermark = !isProLicensed; // Free users get default watermark
+    
     try {
         const savePath = store.get('savePath');
         
@@ -237,6 +274,12 @@ ipcMain.handle('save-video', async (event, { filename, data, format, quality, wi
                     filters += `,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`;
                 }
                 
+                // Add watermark for free users (before palette generation)
+                if (shouldAddWatermark) {
+                    // Text watermark - semi-transparent in bottom-left corner
+                    filters += `,drawtext=text='Blazeycc':fontsize=24:fontcolor=white@0.5:x=10:y=h-35:shadowcolor=black@0.3:shadowx=1:shadowy=1`;
+                }
+                
                 filters += ',split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5';
                 
                 cmd.outputOptions([`-vf ${filters}`, '-loop 0']);
@@ -245,26 +288,56 @@ ipcMain.handle('save-video', async (event, { filename, data, format, quality, wi
                 const outputOptions = [
                     '-c:v libvpx-vp9',
                     `-crf ${crf}`,
-                    '-b:v 0'
+                    '-b:v 0',
+                    useFastEncode ? '-deadline realtime -cpu-used 8' : '-deadline good -cpu-used 4'
                 ];
                 
+                let vfFilters = [];
+                
                 if (width && height) {
-                    outputOptions.push(`-vf scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`);
+                    vfFilters.push(`scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`);
+                }
+                
+                // Add watermark
+                if (shouldAddWatermark) {
+                    vfFilters.push(`drawtext=text='Blazeycc':fontsize=24:fontcolor=white@0.5:x=10:y=h-35:shadowcolor=black@0.3:shadowx=1:shadowy=1`);
+                } else if (customWatermark && customWatermark.type === 'text' && customWatermark.text) {
+                    const pos = getWatermarkPosition(customWatermark.position || 'bottom-left');
+                    vfFilters.push(`drawtext=text='${customWatermark.text.replace(/'/g, "\\'").replace(/:/g, "\\:")}':fontsize=20:fontcolor=white@0.7:x=${pos.x}:y=${pos.y}:shadowcolor=black@0.3:shadowx=1:shadowy=1`);
+                }
+                
+                if (vfFilters.length > 0) {
+                    outputOptions.push(`-vf ${vfFilters.join(',')}`);
                 }
                 
                 cmd.outputOptions(outputOptions);
             } else {
                 // MP4 conversion
+                const preset = useFastEncode ? 'ultrafast' : 'medium';
                 const outputOptions = [
                     '-c:v libx264',
-                    '-preset medium',
+                    `-preset ${preset}`,
                     `-crf ${crf}`,
                     '-pix_fmt yuv420p',
                     '-movflags +faststart'
                 ];
                 
+                let vfFilters = [];
+                
                 if (width && height) {
-                    outputOptions.push(`-vf scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`);
+                    vfFilters.push(`scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`);
+                }
+                
+                // Add watermark
+                if (shouldAddWatermark) {
+                    vfFilters.push(`drawtext=text='Blazeycc':fontsize=24:fontcolor=white@0.5:x=10:y=h-35:shadowcolor=black@0.3:shadowx=1:shadowy=1`);
+                } else if (customWatermark && customWatermark.type === 'text' && customWatermark.text) {
+                    const pos = getWatermarkPosition(customWatermark.position || 'bottom-left');
+                    vfFilters.push(`drawtext=text='${customWatermark.text.replace(/'/g, "\\'").replace(/:/g, "\\:")}':fontsize=20:fontcolor=white@0.7:x=${pos.x}:y=${pos.y}:shadowcolor=black@0.3:shadowx=1:shadowy=1`);
+                }
+                
+                if (vfFilters.length > 0) {
+                    outputOptions.push(`-vf ${vfFilters.join(',')}`);
                 }
                 
                 cmd.outputOptions(outputOptions);
@@ -429,6 +502,97 @@ ipcMain.handle('validate-license', async (event, { email, key }) => {
 ipcMain.handle('clear-license', async () => {
     store.delete('license');
     return { success: true };
+});
+
+// Check if Pro licensed (for renderer to use)
+ipcMain.handle('is-pro-licensed', async () => {
+    const license = store.get('license', null);
+    if (license && license.email && license.key) {
+        return validateLicenseKey(license.email, license.key);
+    }
+    return false;
+});
+
+// Scheduled recordings storage
+ipcMain.handle('get-scheduled-recordings', async () => {
+    return store.get('scheduledRecordings', []);
+});
+
+ipcMain.handle('add-scheduled-recording', async (event, schedule) => {
+    const schedules = store.get('scheduledRecordings', []);
+    const newSchedule = {
+        id: Date.now().toString(),
+        ...schedule,
+        createdAt: new Date().toISOString()
+    };
+    schedules.push(newSchedule);
+    store.set('scheduledRecordings', schedules);
+    return schedules;
+});
+
+ipcMain.handle('remove-scheduled-recording', async (event, id) => {
+    const schedules = store.get('scheduledRecordings', []).filter(s => s.id !== id);
+    store.set('scheduledRecordings', schedules);
+    return schedules;
+});
+
+// Batch URLs storage
+ipcMain.handle('get-batch-urls', async () => {
+    return store.get('batchUrls', []);
+});
+
+ipcMain.handle('set-batch-urls', async (event, urls) => {
+    store.set('batchUrls', urls);
+    return urls;
+});
+
+// Pro settings: Custom watermark
+ipcMain.handle('get-custom-watermark', async () => {
+    return store.get('customWatermark', { type: 'none', text: '', position: 'bottom-left', imagePath: null });
+});
+
+ipcMain.handle('set-custom-watermark', async (event, settings) => {
+    store.set('customWatermark', settings);
+    return settings;
+});
+
+// Pro settings: Fast encoding preference
+ipcMain.handle('get-fast-encode', async () => {
+    return store.get('fastEncode', false);
+});
+
+ipcMain.handle('set-fast-encode', async (event, enabled) => {
+    store.set('fastEncode', enabled);
+    return enabled;
+});
+
+// Pro settings: Cloud sync configuration
+ipcMain.handle('get-cloud-config', async () => {
+    return store.get('cloudConfig', { googleDrive: null, dropbox: null });
+});
+
+ipcMain.handle('set-cloud-config', async (event, config) => {
+    store.set('cloudConfig', config);
+    return config;
+});
+
+// Open external URL (for OAuth)
+ipcMain.handle('open-external', async (event, url) => {
+    shell.openExternal(url);
+    return true;
+});
+
+// Select watermark image
+ipcMain.handle('select-watermark-image', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif'] }]
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+        return { success: true, path: result.filePaths[0] };
+    }
+    return { success: false };
 });
 
 app.whenReady().then(createWindow);

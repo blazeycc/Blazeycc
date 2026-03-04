@@ -55,6 +55,10 @@
       {
         "from": "node_modules/ffmpeg-static/ffmpeg",
         "to": "ffmpeg"
+      },
+      {
+        "from": "blazeycc-logo.png",
+        "to": "watermark.png"
       }
     ],
     "linux": {

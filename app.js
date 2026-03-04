@@ -117,7 +117,9 @@ const state = {
     autoScrollEnabled: false,
     autoScrollInterval: null,
     pendingRecording: null, // For preview before save
-    recordingBlob: null
+    recordingBlob: null,
+    // Pro features
+    customWatermarkSettings: { type: 'none', text: '', position: 'bottom-left', imagePath: null }
 };
 
 // Initialize
@@ -259,10 +261,19 @@ function getExportSettings() {
 function updateSettingsInfo() {
     const preset = elements.formatPreset.value;
     const format = elements.outputFormat.value;
+    
+    // Check if 4K preset selected and user is not Pro
+    const is4kPreset = ['yt-4k', 'vimeo-4k'].includes(preset);
+    const enable4kCheckbox = document.getElementById('enable4k');
+    if (is4kPreset && (!isProLicensed || (isProLicensed && !enable4kCheckbox?.checked))) {
+        showNotification('4K export requires Pro license', 'warning');
+        elements.formatPreset.value = 'yt-1080p'; // Reset to 1080p
+    }
+    
     const { width, height, quality, presetName } = getExportSettings();
     
     // Show/hide custom resolution inputs
-    elements.customResolution.style.display = preset === 'custom' ? 'flex' : 'none';
+    elements.customResolution.style.display = elements.formatPreset.value === 'custom' ? 'flex' : 'none';
     
     const qualityLabels = { 'low': 'Low', 'medium': 'Medium', 'high': 'High', 'ultra': 'Ultra' };
     const formatLabel = format === 'gif' ? 'GIF' : format === 'webm' ? 'WebM' : 'MP4';
@@ -479,6 +490,17 @@ async function savePreviewedRecording() {
     const arrayBuffer = await state.recordingBlob.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
+    // Build Pro settings
+    const removeWatermarkCheckbox = document.getElementById('removeWatermark');
+    const enableFastEncodeCheckbox = document.getElementById('enableFastEncode');
+    const enableCustomWatermarkCheckbox = document.getElementById('enableCustomWatermark');
+    
+    const proSettings = {
+        removeWatermark: isProLicensed && removeWatermarkCheckbox?.checked,
+        fastEncode: isProLicensed && enableFastEncodeCheckbox?.checked,
+        customWatermark: (isProLicensed && enableCustomWatermarkCheckbox?.checked) ? state.customWatermarkSettings : null
+    };
+
     // Save file with conversion
     try {
         const result = await window.electronAPI.saveVideo(
@@ -487,7 +509,8 @@ async function savePreviewedRecording() {
             settings.format,
             settings.quality,
             settings.width,
-            settings.height
+            settings.height,
+            proSettings
         );
         
         hideProgressModal();
@@ -916,3 +939,430 @@ async function deactivateLicense() {
 function isProEnabled() {
     return isProLicensed;
 }
+// ========================================
+// BATCH RECORDING (Pro Feature)
+// ========================================
+let batchQueue = [];
+let batchRecordingInProgress = false;
+let batchCurrentIndex = 0;
+
+function initBatchRecording() {
+    const enableBatchCheckbox = document.getElementById('enableBatch');
+    const batchSection = document.getElementById('batchSection');
+    const startBatchBtn = document.getElementById('startBatchBtn');
+    
+    enableBatchCheckbox?.addEventListener('change', (e) => {
+        if (batchSection) {
+            batchSection.style.display = e.target.checked ? 'block' : 'none';
+        }
+    });
+    
+    startBatchBtn?.addEventListener('click', startBatchRecording);
+}
+
+async function startBatchRecording() {
+    if (batchRecordingInProgress) {
+        showNotification('Batch recording already in progress', 'warning');
+        return;
+    }
+    
+    const batchUrlsTextarea = document.getElementById('batchUrls');
+    const batchDuration = document.getElementById('batchDuration');
+    const urls = batchUrlsTextarea?.value.trim().split('\n').filter(url => url.trim());
+    
+    if (!urls || urls.length === 0) {
+        showNotification('Please enter at least one URL', 'error');
+        return;
+    }
+    
+    const duration = parseInt(batchDuration?.value || '30') * 1000;
+    batchQueue = urls.map(url => ({ url: url.trim(), duration }));
+    batchCurrentIndex = 0;
+    batchRecordingInProgress = true;
+    
+    // Show progress
+    const batchProgress = document.getElementById('batchProgress');
+    const batchTotalNum = document.getElementById('batchTotalNum');
+    if (batchProgress) batchProgress.style.display = 'block';
+    if (batchTotalNum) batchTotalNum.textContent = batchQueue.length;
+    
+    showNotification(`Starting batch recording of ${batchQueue.length} URLs`, 'info');
+    await processBatchQueue();
+}
+
+async function processBatchQueue() {
+    if (batchCurrentIndex >= batchQueue.length) {
+        // Done
+        batchRecordingInProgress = false;
+        const batchProgress = document.getElementById('batchProgress');
+        if (batchProgress) batchProgress.style.display = 'none';
+        showNotification('Batch recording complete!', 'success');
+        return;
+    }
+    
+    const item = batchQueue[batchCurrentIndex];
+    const batchCurrentNum = document.getElementById('batchCurrentNum');
+    const batchCurrentUrl = document.getElementById('batchCurrentUrl');
+    
+    if (batchCurrentNum) batchCurrentNum.textContent = batchCurrentIndex + 1;
+    if (batchCurrentUrl) batchCurrentUrl.textContent = item.url;
+    
+    // Load website
+    elements.urlInput.value = item.url;
+    loadWebsite();
+    
+    // Wait for page to load
+    await new Promise(resolve => {
+        const loadHandler = () => {
+            elements.webview.removeEventListener('did-finish-load', loadHandler);
+            resolve();
+        };
+        elements.webview.addEventListener('did-finish-load', loadHandler);
+        // Timeout after 30 seconds
+        setTimeout(resolve, 30000);
+    });
+    
+    // Wait a bit for page to settle
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Start recording
+    startRecording();
+    
+    // Wait for duration
+    await new Promise(resolve => setTimeout(resolve, item.duration));
+    
+    // Stop recording
+    stopRecording();
+    
+    // Wait for recording to save (wait for preview modal to open and auto-save)
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Auto-save the recording
+    if (state.recordingBlob) {
+        await savePreviewedRecording();
+    }
+    
+    // Move to next
+    batchCurrentIndex++;
+    await processBatchQueue();
+}
+
+// ========================================
+// SCHEDULED RECORDING (Pro Feature)
+// ========================================
+let scheduledRecordings = [];
+let scheduleCheckInterval = null;
+
+function initScheduledRecording() {
+    const enableScheduleCheckbox = document.getElementById('enableSchedule');
+    const scheduleSection = document.getElementById('scheduleSection');
+    const addScheduleBtn = document.getElementById('addScheduleBtn');
+    
+    enableScheduleCheckbox?.addEventListener('change', (e) => {
+        if (scheduleSection) {
+            scheduleSection.style.display = e.target.checked ? 'block' : 'none';
+        }
+        
+        if (e.target.checked) {
+            loadScheduledRecordings();
+            startScheduleChecker();
+        } else {
+            stopScheduleChecker();
+        }
+    });
+    
+    addScheduleBtn?.addEventListener('click', addScheduledRecording);
+}
+
+async function loadScheduledRecordings() {
+    try {
+        scheduledRecordings = await window.electronAPI.getScheduledRecordings() || [];
+        renderScheduleList();
+    } catch (error) {
+        console.error('Error loading scheduled recordings:', error);
+    }
+}
+
+function renderScheduleList() {
+    const scheduleList = document.getElementById('scheduleList');
+    if (!scheduleList) return;
+    
+    if (scheduledRecordings.length === 0) {
+        scheduleList.innerHTML = '<p class="empty-message">No scheduled recordings</p>';
+        return;
+    }
+    
+    scheduleList.innerHTML = scheduledRecordings.map((item, index) => `
+        <div class="schedule-item">
+            <div class="schedule-item-info">
+                <span class="schedule-item-url" title="${item.url}">${item.url}</span>
+                <span class="schedule-item-time">${new Date(item.time).toLocaleString()} - ${item.duration}s</span>
+            </div>
+            <button class="btn btn-small btn-danger" onclick="removeScheduledRecording(${index})">✕</button>
+        </div>
+    `).join('');
+}
+
+async function addScheduledRecording() {
+    const scheduleUrl = document.getElementById('scheduleUrl');
+    const scheduleTime = document.getElementById('scheduleTime');
+    const scheduleDuration = document.getElementById('scheduleDuration');
+    
+    const url = scheduleUrl?.value.trim();
+    const time = scheduleTime?.value;
+    const duration = parseInt(scheduleDuration?.value || '60');
+    
+    if (!url) {
+        showNotification('Please enter a URL', 'error');
+        return;
+    }
+    
+    if (!time) {
+        showNotification('Please select a time', 'error');
+        return;
+    }
+    
+    const scheduleTimeMs = new Date(time).getTime();
+    if (scheduleTimeMs <= Date.now()) {
+        showNotification('Please select a future time', 'error');
+        return;
+    }
+    
+    const newSchedule = { url, time: scheduleTimeMs, duration };
+    
+    try {
+        await window.electronAPI.addScheduledRecording(newSchedule);
+        scheduledRecordings.push(newSchedule);
+        renderScheduleList();
+        
+        // Clear form
+        if (scheduleUrl) scheduleUrl.value = '';
+        if (scheduleTime) scheduleTime.value = '';
+        
+        showNotification('Recording scheduled!', 'success');
+    } catch (error) {
+        showNotification('Error scheduling recording', 'error');
+    }
+}
+
+window.removeScheduledRecording = async function(index) {
+    try {
+        await window.electronAPI.removeScheduledRecording(index);
+        scheduledRecordings.splice(index, 1);
+        renderScheduleList();
+        showNotification('Schedule removed', 'info');
+    } catch (error) {
+        showNotification('Error removing schedule', 'error');
+    }
+};
+
+function startScheduleChecker() {
+    if (scheduleCheckInterval) return;
+    
+    scheduleCheckInterval = setInterval(async () => {
+        const now = Date.now();
+        
+        for (let i = scheduledRecordings.length - 1; i >= 0; i--) {
+            const item = scheduledRecordings[i];
+            if (item.time <= now && !item.started) {
+                // Mark as started and execute
+                item.started = true;
+                showNotification(`Starting scheduled recording: ${item.url}`, 'info');
+                
+                // Load and record
+                elements.urlInput.value = item.url;
+                loadWebsite();
+                
+                // Wait for load
+                await new Promise(resolve => {
+                    const loadHandler = () => {
+                        elements.webview.removeEventListener('did-finish-load', loadHandler);
+                        resolve();
+                    };
+                    elements.webview.addEventListener('did-finish-load', loadHandler);
+                    setTimeout(resolve, 30000);
+                });
+                
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                startRecording();
+                
+                // Stop after duration
+                setTimeout(async () => {
+                    stopRecording();
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    if (state.recordingBlob) {
+                        await savePreviewedRecording();
+                    }
+                    
+                    // Remove from list
+                    await window.electronAPI.removeScheduledRecording(i);
+                    scheduledRecordings.splice(i, 1);
+                    renderScheduleList();
+                }, item.duration * 1000);
+            }
+        }
+    }, 10000); // Check every 10 seconds
+}
+
+function stopScheduleChecker() {
+    if (scheduleCheckInterval) {
+        clearInterval(scheduleCheckInterval);
+        scheduleCheckInterval = null;
+    }
+}
+
+// ========================================
+// CUSTOM WATERMARK (Pro Feature)
+// ========================================
+function initCustomWatermark() {
+    const enableCustomWatermarkCheckbox = document.getElementById('enableCustomWatermark');
+    const customWatermarkSection = document.getElementById('customWatermarkSection');
+    const watermarkTextOptions = document.getElementById('watermarkTextOptions');
+    const watermarkImageOptions = document.getElementById('watermarkImageOptions');
+    const selectWatermarkImageBtn = document.getElementById('selectWatermarkImage');
+    
+    // Store watermark settings in state
+    state.customWatermarkSettings = { type: 'none', text: '', position: 'bottom-left', imagePath: null };
+    
+    enableCustomWatermarkCheckbox?.addEventListener('change', async (e) => {
+        if (customWatermarkSection) {
+            customWatermarkSection.style.display = e.target.checked ? 'block' : 'none';
+        }
+        if (e.target.checked) {
+            // Load saved settings
+            try {
+                state.customWatermarkSettings = await window.electronAPI.getCustomWatermark();
+            } catch (e) {}
+        }
+    });
+    
+    // Radio buttons for watermark type
+    document.querySelectorAll('input[name="watermarkType"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const type = e.target.value;
+            state.customWatermarkSettings.type = type;
+            
+            if (watermarkTextOptions) watermarkTextOptions.style.display = type === 'text' ? 'flex' : 'none';
+            if (watermarkImageOptions) watermarkImageOptions.style.display = type === 'image' ? 'flex' : 'none';
+            
+            saveCustomWatermarkSettings();
+        });
+    });
+    
+    // Custom text input
+    document.getElementById('customWatermarkText')?.addEventListener('input', (e) => {
+        state.customWatermarkSettings.text = e.target.value;
+        saveCustomWatermarkSettings();
+    });
+    
+    // Position selector
+    document.getElementById('watermarkPosition')?.addEventListener('change', (e) => {
+        state.customWatermarkSettings.position = e.target.value;
+        saveCustomWatermarkSettings();
+    });
+    
+    // Select image button
+    selectWatermarkImageBtn?.addEventListener('click', async () => {
+        try {
+            const result = await window.electronAPI.selectWatermarkImage();
+            if (result.success) {
+                state.customWatermarkSettings.imagePath = result.path;
+                document.getElementById('watermarkImageName').textContent = result.path.split('/').pop();
+                saveCustomWatermarkSettings();
+            }
+        } catch (error) {
+            showNotification('Error selecting image', 'error');
+        }
+    });
+}
+
+async function saveCustomWatermarkSettings() {
+    try {
+        await window.electronAPI.setCustomWatermark(state.customWatermarkSettings);
+    } catch (e) {}
+}
+
+// ========================================
+// FAST ENCODING (Pro Feature)
+// ========================================
+function initFastEncoding() {
+    const enableFastEncodeCheckbox = document.getElementById('enableFastEncode');
+    
+    enableFastEncodeCheckbox?.addEventListener('change', async (e) => {
+        try {
+            await window.electronAPI.setFastEncode(e.target.checked);
+            if (e.target.checked) {
+                showNotification('Fast encoding enabled - 2x faster exports!', 'success');
+            }
+        } catch (e) {}
+    });
+    
+    // Load saved setting
+    (async () => {
+        try {
+            const enabled = await window.electronAPI.getFastEncode();
+            if (enableFastEncodeCheckbox) enableFastEncodeCheckbox.checked = enabled;
+        } catch (e) {}
+    })();
+}
+
+// ========================================
+// CLOUD SYNC (Pro Feature) 
+// ========================================
+function initCloudSync() {
+    const enableCloudSyncCheckbox = document.getElementById('enableCloudSync');
+    const cloudSyncSection = document.getElementById('cloudSyncSection');
+    const connectGoogleDriveBtn = document.getElementById('connectGoogleDrive');
+    const connectDropboxBtn = document.getElementById('connectDropbox');
+    
+    enableCloudSyncCheckbox?.addEventListener('change', async (e) => {
+        if (cloudSyncSection) {
+            cloudSyncSection.style.display = e.target.checked ? 'block' : 'none';
+        }
+        if (e.target.checked) {
+            loadCloudStatus();
+        }
+    });
+    
+    connectGoogleDriveBtn?.addEventListener('click', () => {
+        // In a real implementation, this would open OAuth flow
+        showNotification('Google Drive integration coming soon! For now, set save path to your Google Drive sync folder.', 'info');
+    });
+    
+    connectDropboxBtn?.addEventListener('click', () => {
+        // In a real implementation, this would open OAuth flow
+        showNotification('Dropbox integration coming soon! For now, set save path to your Dropbox sync folder.', 'info');
+    });
+}
+
+async function loadCloudStatus() {
+    try {
+        const config = await window.electronAPI.getCloudConfig();
+        const cloudStatus = document.getElementById('cloudStatus');
+        
+        if (config.googleDrive || config.dropbox) {
+            cloudStatus.innerHTML = `
+                <div class="cloud-connected">
+                    ${config.googleDrive ? '✅ Google Drive connected' : ''}
+                    ${config.dropbox ? '✅ Dropbox connected' : ''}
+                </div>
+            `;
+        } else {
+            // Suggest using sync folder
+            const savePath = await window.electronAPI.getSavePath();
+            cloudStatus.innerHTML = `
+                <p class="help-text">💡 Tip: Set your save location to a cloud-synced folder (e.g., ~/Google Drive/Recordings or ~/Dropbox/Recordings)</p>
+                <p class="help-text">Current: ${savePath}</p>
+            `;
+        }
+    } catch (e) {}
+}
+
+// Initialize Pro features
+document.addEventListener('DOMContentLoaded', () => {
+    initBatchRecording();
+    initScheduledRecording();
+    initCustomWatermark();
+    initFastEncoding();
+    initCloudSync();
+});

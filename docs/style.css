@@ -503,8 +503,19 @@ nav {
 
 .support-subtitle {
     color: var(--text-muted);
-    margin-bottom: 3rem;
+    margin-bottom: 2rem;
     font-size: 1.125rem;
+}
+
+.sponsor-card-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2.5rem;
+}
+
+.sponsor-card-wrapper iframe {
+    border-radius: 12px;
+    max-width: 100%;
 }
 
 .support-options {

@@ -21,6 +21,7 @@
 ### 🚀 Pro Features (Coming Soon)
 
 Support the project to unlock premium features:
+
 - 🎨 **Watermark Removal** - Clean exports without branding
 - 📺 **4K Export** - Ultra-high quality 3840×2160 output
 - 📋 **Batch Recording** - Record multiple URLs in sequence
