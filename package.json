@@ -63,11 +63,13 @@
         "rpm"
       ],
       "category": "Utility",
+      "icon": "build/icon.png",
       "maintainer": "theKennethy <thekennethy@github.com>",
       "artifactName": "${productName}.${ext}"
     },
     "win": {
       "target": "nsis",
+      "icon": "build/icon.ico",
       "artifactName": "${productName}.${ext}"
     },
     "nsis": {
