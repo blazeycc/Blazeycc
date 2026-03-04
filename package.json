@@ -8,7 +8,8 @@
     "start:gpu": "electron . --enable-gpu",
     "build": "electron-builder",
     "build:linux": "electron-builder --linux",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
   },
   "keywords": [
     "screen-recording",
@@ -74,6 +75,18 @@
     },
     "portable": {
       "artifactName": "${productName}-Portable.${ext}"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.png",
+      "artifactName": "${productName}.${ext}"
+    },
+    "dmg": {
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
     },
     "nsis": {
       "oneClick": false,
