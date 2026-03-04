@@ -433,6 +433,23 @@ nav {
     gap: 0.75rem;
 }
 
+.windows-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.btn-secondary-download {
+    background: var(--bg-elevated);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary-download:hover {
+    background: var(--bg-elevated);
+    border-color: var(--primary);
+}
+
 .btn-download-alt {
     display: block;
     padding: 0.75rem 1rem;

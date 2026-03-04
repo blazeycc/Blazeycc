@@ -68,9 +68,12 @@
       "artifactName": "${productName}.${ext}"
     },
     "win": {
-      "target": "nsis",
+      "target": ["nsis", "portable"],
       "icon": "build/icon.ico",
       "artifactName": "${productName}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable.${ext}"
     },
     "nsis": {
       "oneClick": false,
