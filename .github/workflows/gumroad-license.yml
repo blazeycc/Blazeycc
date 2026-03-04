@@ -70,7 +70,7 @@ jobs:
           echo "key=$LICENSE_KEY" >> $GITHUB_OUTPUT
       
       - name: Send License Email via SendGrid
-        if: ${{ secrets.SENDGRID_API_KEY != '' }}
+        if: env.SENDGRID_API_KEY != ''
         env:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
