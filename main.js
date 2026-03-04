@@ -383,6 +383,54 @@ ipcMain.handle('set-theme', async (event, theme) => {
     return theme;
 });
 
+// License management
+const crypto = require('crypto');
+const LICENSE_SECRET = 'blazeycc-pro-2026-change-this-secret';
+
+function generateExpectedKey(email) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const hash = crypto.createHmac('sha256', LICENSE_SECRET)
+        .update(normalizedEmail)
+        .digest('hex')
+        .substring(0, 32)
+        .toUpperCase();
+    return hash.match(/.{1,8}/g).join('-');
+}
+
+function validateLicenseKey(email, key) {
+    if (!email || !key) return false;
+    const expectedKey = generateExpectedKey(email);
+    const normalizedKey = key.toUpperCase().replace(/\s/g, '');
+    return normalizedKey === expectedKey;
+}
+
+ipcMain.handle('get-license', async () => {
+    const license = store.get('license', null);
+    if (license && license.email && license.key) {
+        const isValid = validateLicenseKey(license.email, license.key);
+        return { ...license, isValid };
+    }
+    return { email: null, key: null, isValid: false };
+});
+
+ipcMain.handle('set-license', async (event, { email, key }) => {
+    const isValid = validateLicenseKey(email, key);
+    if (isValid) {
+        store.set('license', { email, key, activatedAt: new Date().toISOString() });
+        return { success: true, message: 'Pro license activated!' };
+    }
+    return { success: false, message: 'Invalid license key' };
+});
+
+ipcMain.handle('validate-license', async (event, { email, key }) => {
+    return validateLicenseKey(email, key);
+});
+
+ipcMain.handle('clear-license', async () => {
+    store.delete('license');
+    return { success: true };
+});
+
 app.whenReady().then(createWindow);
 
 // Handle uncaught exceptions to prevent crashes

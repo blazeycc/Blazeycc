@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getTheme: () => ipcRenderer.invoke('get-theme'),
     setTheme: (theme) => ipcRenderer.invoke('set-theme', theme),
     
+    // License
+    getLicense: () => ipcRenderer.invoke('get-license'),
+    setLicense: (email, key) => ipcRenderer.invoke('set-license', { email, key }),
+    validateLicense: (email, key) => ipcRenderer.invoke('validate-license', { email, key }),
+    clearLicense: () => ipcRenderer.invoke('clear-license'),
+    
     // FFmpeg progress listener
     onFFmpegProgress: (callback) => {
         ipcRenderer.on('ffmpeg-progress', (event, data) => callback(data));

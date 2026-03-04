@@ -26,3 +26,4 @@ playwright-report/
 # Temporary files
 *.tmp
 *.temp
+generate-key.js

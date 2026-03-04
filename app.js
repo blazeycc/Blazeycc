@@ -224,6 +224,11 @@ async function init() {
     await loadBookmarks();
     await loadHistory();
     await loadSavePath();
+    await loadLicense();
+    
+    // License event listeners
+    document.getElementById('activateLicenseBtn')?.addEventListener('click', activateLicense);
+    document.getElementById('deactivateLicenseBtn')?.addEventListener('click', deactivateLicense);
 
     showNotification('Ready! Enter a URL to get started.', 'info');
 }
@@ -796,4 +801,118 @@ function stopAutoScroll() {
         clearInterval(state.autoScrollInterval);
         state.autoScrollInterval = null;
     }
+}
+
+// License management
+let isProLicensed = false;
+
+async function loadLicense() {
+    try {
+        const license = await window.electronAPI.getLicense();
+        if (license && license.isValid) {
+            isProLicensed = true;
+            showLicenseActive(license.email);
+            unlockProFeatures();
+        } else {
+            isProLicensed = false;
+            showLicenseInactive();
+        }
+    } catch (error) {
+        console.error('Error loading license:', error);
+    }
+}
+
+function showLicenseActive(email) {
+    const inactiveSection = document.getElementById('licenseInactive');
+    const activeSection = document.getElementById('licenseActive');
+    const emailDisplay = document.getElementById('licenseEmailDisplay');
+    
+    if (inactiveSection) inactiveSection.style.display = 'none';
+    if (activeSection) activeSection.style.display = 'block';
+    if (emailDisplay) emailDisplay.textContent = email;
+}
+
+function showLicenseInactive() {
+    const inactiveSection = document.getElementById('licenseInactive');
+    const activeSection = document.getElementById('licenseActive');
+    
+    if (inactiveSection) inactiveSection.style.display = 'block';
+    if (activeSection) activeSection.style.display = 'none';
+}
+
+function unlockProFeatures() {
+    const proSection = document.querySelector('.pro-section');
+    if (proSection) {
+        proSection.classList.add('pro-unlocked');
+    }
+    
+    // Enable Pro checkboxes
+    const proCheckboxes = document.querySelectorAll('.pro-feature input');
+    proCheckboxes.forEach(cb => {
+        cb.disabled = false;
+    });
+}
+
+function lockProFeatures() {
+    const proSection = document.querySelector('.pro-section');
+    if (proSection) {
+        proSection.classList.remove('pro-unlocked');
+    }
+    
+    // Disable Pro checkboxes
+    const proCheckboxes = document.querySelectorAll('.pro-feature input');
+    proCheckboxes.forEach(cb => {
+        cb.disabled = true;
+        cb.checked = false;
+    });
+}
+
+async function activateLicense() {
+    const emailInput = document.getElementById('licenseEmail');
+    const keyInput = document.getElementById('licenseKey');
+    
+    const email = emailInput?.value?.trim();
+    const key = keyInput?.value?.trim();
+    
+    if (!email || !key) {
+        showNotification('Please enter both email and license key', 'error');
+        return;
+    }
+    
+    try {
+        const result = await window.electronAPI.setLicense(email, key);
+        if (result.success) {
+            isProLicensed = true;
+            showLicenseActive(email);
+            unlockProFeatures();
+            showNotification('🎉 Pro license activated!', 'success');
+        } else {
+            showNotification(result.message || 'Invalid license key', 'error');
+        }
+    } catch (error) {
+        showNotification('Error activating license: ' + error.message, 'error');
+    }
+}
+
+async function deactivateLicense() {
+    try {
+        await window.electronAPI.clearLicense();
+        isProLicensed = false;
+        showLicenseInactive();
+        lockProFeatures();
+        showNotification('License deactivated', 'info');
+        
+        // Clear inputs
+        const emailInput = document.getElementById('licenseEmail');
+        const keyInput = document.getElementById('licenseKey');
+        if (emailInput) emailInput.value = '';
+        if (keyInput) keyInput.value = '';
+    } catch (error) {
+        showNotification('Error deactivating license', 'error');
+    }
+}
+
+// Helper to check if Pro features are enabled
+function isProEnabled() {
+    return isProLicensed;
 }

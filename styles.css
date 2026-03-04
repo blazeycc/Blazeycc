@@ -1088,3 +1088,82 @@ body {
     opacity: 0.9;
     transform: translateY(-1px);
 }
+
+/* License Section */
+.license-section {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.license-info {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.license-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.license-input::placeholder {
+    color: var(--text-muted);
+}
+
+.btn-sponsor {
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    text-align: center;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-sponsor:hover {
+    border-color: #9333ea;
+    color: #9333ea;
+}
+
+.license-active {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.license-success {
+    color: var(--accent-success);
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.license-email {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.pro-unlocked .pro-feature {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.pro-unlocked .pro-feature label {
+    cursor: pointer;
+}
+
+.pro-unlocked .pro-lock {
+    display: none;
+}
