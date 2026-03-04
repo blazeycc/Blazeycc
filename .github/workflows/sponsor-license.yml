@@ -1,11 +1,6 @@
 name: Generate Sponsor License Key
 
 on:
-  # Triggers when someone sponsors
-  sponsorship:
-    types: [created]
-  
-  # Manual trigger for generating keys
   workflow_dispatch:
     inputs:
       sponsor_email:
@@ -19,32 +14,16 @@ jobs:
   generate-key:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Get Sponsor Info
-        id: sponsor
-        run: |
-          if [ "${{ github.event_name }}" == "sponsorship" ]; then
-            SPONSOR_LOGIN="${{ github.event.sponsorship.sponsor.login }}"
-            SPONSOR_EMAIL="${SPONSOR_LOGIN}@users.noreply.github.com"
-          else
-            SPONSOR_LOGIN="${{ github.event.inputs.sponsor_login }}"
-            SPONSOR_EMAIL="${{ github.event.inputs.sponsor_email }}"
-          fi
-          
-          echo "login=$SPONSOR_LOGIN" >> $GITHUB_OUTPUT
-          echo "email=$SPONSOR_EMAIL" >> $GITHUB_OUTPUT
-      
       - name: Generate License Key
         id: generate
         env:
           LICENSE_SECRET: ${{ secrets.LICENSE_SECRET }}
         run: |
-          SPONSOR_EMAIL="${{ steps.sponsor.outputs.email }}"
+          SPONSOR_EMAIL="${{ github.event.inputs.sponsor_email }}"
           SECRET="${LICENSE_SECRET:-blazeycc-pro-2026-change-this-secret}"
           
           # Generate HMAC-SHA256 hash
-          HASH=$(echo -n "$SPONSOR_EMAIL" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
+          HASH=$(echo -n "$SPONSOR_EMAIL" | openssl dgst -sha256 -hmac "$SECRET" | cut -d" " -f2)
           
           # Format as XXXX-XXXX-XXXX-XXXX
           LICENSE_KEY=$(echo "${HASH:0:16}" | tr "[:lower:]" "[:upper:]" | sed "s/\(....\)/\1-/g" | sed "s/-$//")
@@ -58,8 +37,8 @@ jobs:
           echo "   SPONSOR LICENSE KEY GENERATED"
           echo "============================================"
           echo ""
-          echo "  Sponsor:  ${{ steps.sponsor.outputs.login }}"
-          echo "  Email:    ${{ steps.sponsor.outputs.email }}"
+          echo "  Sponsor:  ${{ github.event.inputs.sponsor_login }}"
+          echo "  Email:    ${{ github.event.inputs.sponsor_email }}"
           echo ""
           echo "  LICENSE KEY:"
           echo "  ${{ steps.generate.outputs.key }}"
