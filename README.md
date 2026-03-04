@@ -1,4 +1,4 @@
-# Glimse
+# Blazeycc
 
 **Record any website as video** - Capture demos, tutorials, and presentations as high-quality MP4, WebM, or GIF.
 
@@ -19,10 +19,10 @@
 
 Download the latest release for your platform:
 
-- **Windows**: [glimse-setup-1.0.0.exe](https://github.com/theKennethy/glimse/releases/latest)
-- **Linux AppImage**: [glimse-1.0.0.AppImage](https://github.com/theKennethy/glimse/releases/latest)
-- **Linux .deb**: [glimse_1.0.0_amd64.deb](https://github.com/theKennethy/glimse/releases/latest)
-- **Linux .rpm**: [glimse-1.0.0.x86_64.rpm](https://github.com/theKennethy/glimse/releases/latest)
+- **Windows**: [blazeycc-setup-1.0.0.exe](https://github.com/theKennethy/blazeycc/releases/latest)
+- **Linux AppImage**: [blazeycc-1.0.0.AppImage](https://github.com/theKennethy/blazeycc/releases/latest)
+- **Linux .deb**: [blazeycc_1.0.0_amd64.deb](https://github.com/theKennethy/blazeycc/releases/latest)
+- **Linux .rpm**: [blazeycc-1.0.0.x86_64.rpm](https://github.com/theKennethy/blazeycc/releases/latest)
 
 ## Development
 
