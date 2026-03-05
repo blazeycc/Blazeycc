@@ -257,9 +257,14 @@
     </div>
 
     <script>
+        // Use Cloudflare Worker API for secure sponsor verification
+        // Deploy worker and set this URL, or use client-side fallback
+        const WORKER_URL = ''; // e.g., 'https://blazeycc-license.your-subdomain.workers.dev'
+        
+        // Client-side fallback (only if worker not configured)
         const SECRET = '4f6fab93b5f0bfb47f3431ab19b230994e94cc946d479e27cf82b1b85c7aaee3';
         
-        async function generateKey(email) {
+        async function generateKeyClient(email) {
             const encoder = new TextEncoder();
             const keyData = encoder.encode(SECRET);
             const messageData = encoder.encode(email.toLowerCase().trim());
@@ -277,24 +282,50 @@
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             const shortHash = hashHex.substring(0, 32).toUpperCase();
             
-            // Format as XXXX-XXXX-XXXX-XXXX
             return shortHash.match(/.{1,8}/g).join('-');
+        }
+        
+        async function generateKeyServer(email) {
+            const response = await fetch(WORKER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.message || data.error || 'Failed to verify sponsor');
+            }
+            
+            return data.licenseKey;
         }
         
         document.getElementById('licenseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const btn = document.getElementById('generateBtn');
+            const hint = document.getElementById('copyHint');
             
             btn.disabled = true;
-            btn.textContent = 'Generating...';
+            btn.textContent = 'Verifying...';
             
             try {
-                const key = await generateKey(email);
+                let key;
+                if (WORKER_URL) {
+                    // Secure: verify sponsor via GitHub API
+                    key = await generateKeyServer(email);
+                } else {
+                    // Fallback: client-side generation (trust-based)
+                    key = await generateKeyClient(email);
+                }
+                
                 document.getElementById('licenseKey').textContent = key;
                 document.getElementById('result').classList.add('show');
+                hint.textContent = 'Click to copy';
+                hint.classList.remove('copied');
             } catch (err) {
-                alert('Error generating key: ' + err.message);
+                alert(err.message);
             }
             
             btn.disabled = false;
