@@ -165,6 +165,13 @@ async function init() {
         if (scrollSpeedControl) {
             scrollSpeedControl.style.display = e.target.checked ? 'flex' : 'none';
         }
+        // Start/stop auto-scroll immediately when toggled (if website is loaded)
+        if (e.target.checked && state.websiteLoaded) {
+            startAutoScroll();
+            showNotification('Auto-scroll started', 'info');
+        } else {
+            stopAutoScroll();
+        }
     });
     
     if (scrollSpeedInput && scrollSpeedValue) {
