@@ -1,6 +1,6 @@
 {
   "name": "blazeycc",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Record any website as video",
   "main": "main.js",
   "scripts": {
@@ -20,10 +20,10 @@
     "name": "theKennethy",
     "email": "thekennethy@github.com"
   },
-  "homepage": "https://github.com/theKennethy/blazeycc",
+  "homepage": "https://github.com/blazeycc/Blazeycc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/theKennethy/blazeycc.git"
+    "url": "https://github.com/blazeycc/Blazeycc.git"
   },
   "license": "GPL-3.0",
   "devDependencies": {
