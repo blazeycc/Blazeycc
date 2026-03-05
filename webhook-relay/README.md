@@ -1,88 +1,88 @@
-# Gumroad → GitHub License Automation
+# GitHub Sponsors → License Automation
 
-This webhook relay connects Gumroad sales to automatic license key delivery.
+This webhook relay automatically sends license keys to GitHub Sponsors.
 
 ## How It Works
 
 ```
-Customer buys on Gumroad → Gumroad sends ping → Cloudflare Worker → GitHub Actions → Email with license key
+Sponsor on GitHub → GitHub sends webhook → Cloudflare Worker → Email with license key
 ```
 
 ## Setup Steps
 
-### 1. Create a GitHub Personal Access Token
-
-1. Go to [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
-2. Generate new token (fine-grained)
-3. Select repository: `Blazeycc`
-4. Permissions: `Contents: Read`, `Actions: Write`
-5. Copy the token
-
-### 2. Deploy the Cloudflare Worker
+### 1. Deploy the Cloudflare Worker
 
 1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) (free account)
 2. Click **Workers & Pages** → **Create Worker**
 3. Paste the code from `cloudflare-worker.js`
 4. Click **Settings** → **Variables** → Add:
-   - `GITHUB_TOKEN`: Your GitHub token from step 1
-   - `GITHUB_OWNER`: `theKennethy`
-   - `GITHUB_REPO`: `Blazeycc`
+   - `LICENSE_SECRET`: Your license key secret (same as generate-key.js)
+   - `SENDGRID_API_KEY`: (optional) SendGrid API key for auto-emails
+   - `FROM_EMAIL`: (optional) Your sender email address
 5. Deploy and copy your worker URL (e.g., `https://your-worker.workers.dev`)
 
-### 3. Configure Gumroad Ping
+### 2. Configure GitHub Sponsors Webhook
 
-1. Go to [gumroad.com/settings/advanced](https://gumroad.com/settings/advanced)
-2. Scroll to **Ping** section
-3. Enter your Cloudflare Worker URL
-4. Save
+1. Go to [github.com/sponsors/blazeycc/dashboard](https://github.com/sponsors/blazeycc/dashboard)
+2. Click **Webhooks** tab
+3. Click **Add webhook**
+4. Enter your Cloudflare Worker URL
+5. Create a webhook secret and add it as `WEBHOOK_SECRET` env var in your worker
+6. Select event: **Sponsorship** → **created**
+7. Save
 
-### 4. Create the Product on Gumroad
+### 3. Set Up Email (Optional)
 
-1. Go to [gumroad.com/products](https://gumroad.com/products)
-2. Create a new product:
-   - **Name**: Blazeycc Pro License
-   - **Price**: $5 (or your preferred price - one-time or subscription)
-   - **Description**: 
+For automatic email delivery:
+
+1. Sign up at [sendgrid.com](https://sendgrid.com)
+2. Verify your sender email/domain
+3. Get your API key
+4. Add `SENDGRID_API_KEY` to your Cloudflare Worker variables
+
+If not configured, licenses will be logged and available via GitHub Actions workflow.
+
+### 4. Create Sponsor Tiers
+
+1. Go to [github.com/sponsors/blazeycc/dashboard](https://github.com/sponsors/blazeycc/dashboard)
+2. Create tier(s):
+   - **Blazeycc Pro** ($7/month):
      ```
-     🎉 Blazeycc Pro License Key
+     🎉 Blazeycc Pro License
      
      ✅ No watermark on videos
      ✅ 4K export support
-     ✅ Custom watermark with your own text
-     ✅ Fast encoding (2x speed)
      ✅ Batch URL recording
      ✅ Scheduled recordings
-     ✅ Cloud sync support
      
-     Your license key will be emailed automatically after purchase!
+     Your license key will be emailed automatically!
      ```
 
 ### 5. Test the Setup
 
-Make a test purchase (you can refund it) or use Gumroad's test ping feature.
+1. Use GitHub's webhook test feature in the dashboard
+2. Or sponsor yourself with a test tier
+3. Check Cloudflare Worker logs for the license key
 
-## Both Platforms Together
+## Alternative: GitHub Actions Only
 
-You can accept payments from **both** Gumroad and GitHub Sponsors simultaneously:
+If you prefer not to use Cloudflare Workers, the repo includes a GitHub Actions workflow (`.github/workflows/sponsor-license.yml`) that:
 
-| Platform | Workflow | Trigger |
-|----------|----------|---------|
-| GitHub Sponsors | `sponsor-license.yml` | `sponsorship` event |
-| Gumroad | `gumroad-license.yml` | `repository_dispatch` from webhook |
+1. Triggers on new sponsorships
+2. Generates a license key
+3. Creates an issue with the key for you to send manually
 
-Both generate the same format license keys, so users can purchase from either platform.
+## Environment Variables Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `LICENSE_SECRET` | Yes | Secret for HMAC license generation |
+| `SENDGRID_API_KEY` | No | SendGrid API key for auto-emails |
+| `FROM_EMAIL` | No | Sender email (default: noreply@blazey.cc) |
+| `WEBHOOK_SECRET` | No | GitHub webhook secret for verification |
 
 ## Troubleshooting
 
-1. **No email received?** Check GitHub Actions logs for the generated key
-2. **Webhook not triggering?** Verify Cloudflare Worker logs in dashboard
-3. **GitHub API error?** Make sure your token has correct permissions
-
-## Alternative: Zapier/Make (No Code)
-
-If you prefer no-code, use Zapier or Make:
-
-1. Create a Zap: Gumroad Sale → Webhooks (POST to GitHub API)
-2. URL: `https://api.github.com/repos/theKennethy/Blazeycc/dispatches`
-3. Headers: `Authorization: Bearer YOUR_TOKEN`
-4. Body: `{"event_type": "gumroad_sale", "client_payload": {"email": "{{email}}", "full_name": "{{full_name}}", "sale_id": "{{sale_id}}"}}`
+- **No email received**: Check SendGrid API key and sender verification
+- **Worker not receiving events**: Verify webhook URL and event selection
+- **Invalid license**: Ensure LICENSE_SECRET matches between worker and app

@@ -4,49 +4,26 @@ This guide explains how to automatically send Pro license keys to GitHub Sponsor
 
 ## Overview
 
-When someone sponsors you on GitHub, a webhook is triggered. You can use this webhook to:
+When someone sponsors the blazeycc organization on GitHub, a webhook is triggered to:
 
 1. Generate a unique license key for the sponsor
 2. Email the key to them automatically
 
 ## Options for Automation
 
-### Option 1: GitHub Actions (Recommended - Free)
+### Option 1: GitHub Actions (Included)
 
-Create `.github/workflows/sponsor-webhook.yml`:
+The repo includes `.github/workflows/sponsor-license.yml` which:
 
-```yaml
-name: Handle Sponsor Webhook
+1. Triggers automatically on new sponsorships
+2. Generates a license key
+3. Creates an issue with the key for manual delivery
 
-on:
-  sponsor:
-    types: [created]
+### Option 2: Cloudflare Worker (Auto-Email)
 
-jobs:
-  send-license:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Generate and Send License
-        env:
-          SPONSOR_EMAIL: ${{ github.event.sponsor.email }}
-          SPONSOR_NAME: ${{ github.event.sponsor.login }}
-          LICENSE_SECRET: ${{ secrets.LICENSE_SECRET }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          FROM_EMAIL: "blazeycc@yourdomain.com"
-        run: |
-          node scripts/send-sponsor-license.js
-```
+Deploy `webhook-relay/cloudflare-worker.js` to Cloudflare Workers for automatic email delivery.
 
-### Option 2: Vercel Serverless Function
-
-Deploy `api/sponsor-webhook.js` to Vercel.
+See `webhook-relay/README.md` for complete setup instructions.
 
 ## Setup Steps
 
@@ -55,34 +32,29 @@ Deploy `api/sponsor-webhook.js` to Vercel.
 Go to your repo → Settings → Secrets → Actions:
 
 - `LICENSE_SECRET`: Your license key secret (same as in generate-key.js)
-- `SENDGRID_API_KEY`: Your SendGrid API key for sending emails
+- `SENDGRID_API_KEY`: (optional) Your SendGrid API key for sending emails
 
 ### 2. Configure GitHub Sponsors Webhook
 
-1. Go to github.com/sponsors/YOUR_USERNAME/dashboard
+1. Go to github.com/sponsors/blazeycc/dashboard
 2. Click "Webhooks" tab
-3. Add webhook URL: `https://your-vercel-app.vercel.app/api/sponsor-webhook`
-4. Set secret: (create a random secret)
-5. Select events: "Sponsorship created"
+3. Add webhook URL: Your Cloudflare Worker URL
+4. Select events: "Sponsorship created"
 
-### 3. Set Up Email Provider
+### 3. Set Up Email Provider (Optional)
 
-#### Option A: SendGrid (Recommended)
+#### SendGrid (Recommended)
 
 1. Sign up at sendgrid.com
-2. Verify your sender email
+2. Verify your sender email/domain
 3. Get API key
-
-#### Option B: Resend
-
-1. Sign up at resend.com
-2. Get API key
+4. Add to Cloudflare Worker variables
 
 ## License Key Format
 
-Keys are generated as: `EMAIL-HMAC_HASH`
+Keys are generated as: `XXXX-XXXX-XXXX-XXXX`
 
-Example: `john@example.com` → `BXYZ-1234-ABCD-5678`
+Example: `BXYZ-1234-ABCD-5678`
 
 ## Testing
 

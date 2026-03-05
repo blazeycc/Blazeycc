@@ -1,19 +1,19 @@
 /**
- * Gumroad to GitHub Actions Webhook Relay
+ * GitHub Sponsors Webhook Handler + License Generator
  * 
  * Deploy this to Cloudflare Workers (free tier)
- * This receives Gumroad "ping" webhooks and triggers GitHub Actions
+ * This receives GitHub Sponsors webhooks and sends license keys via email
  * 
  * Setup:
  * 1. Go to dash.cloudflare.com → Workers & Pages → Create Worker
  * 2. Paste this code
  * 3. Add environment variables:
- *    - GITHUB_TOKEN: Your GitHub personal access token (needs repo scope)
- *    - GITHUB_OWNER: blazeycc
- *    - GITHUB_REPO: Blazeycc
- *    - GUMROAD_SECRET: (optional) Your Gumroad ping secret for verification
+ *    - WEBHOOK_SECRET: Your GitHub webhook secret
+ *    - LICENSE_SECRET: Secret for generating license keys
+ *    - SENDGRID_API_KEY: (optional) SendGrid API key for auto-emails
+ *    - FROM_EMAIL: (optional) Sender email address
  * 4. Deploy and copy the worker URL
- * 5. Go to Gumroad → Settings → Ping → Add your worker URL
+ * 5. Go to github.com/sponsors/blazeycc/dashboard → Webhooks → Add webhook URL
  */
 
 export default {
@@ -24,67 +24,52 @@ export default {
     }
 
     try {
-      // Parse the form data from Gumroad
-      const formData = await request.formData();
+      const payload = await request.json();
       
-      // Extract relevant fields
-      const email = formData.get('email');
-      const fullName = formData.get('full_name') || 'Customer';
-      const productName = formData.get('product_name');
-      const saleId = formData.get('sale_id');
-      const sellerEmail = formData.get('seller_email');
-      const purchaserId = formData.get('purchaser_id');
-      const price = formData.get('price');
+      // Handle GitHub Sponsors webhook
+      const action = payload.action;
+      const sponsorship = payload.sponsorship;
       
-      // Verify this is a real sale (not a refund or dispute)
-      const refunded = formData.get('refunded') === 'true';
-      const disputed = formData.get('disputed') === 'true';
-      const chargebacked = formData.get('chargebacked') === 'true';
-      
-      if (refunded || disputed || chargebacked) {
-        return new Response('Skipping: sale was refunded/disputed', { status: 200 });
+      if (!sponsorship) {
+        return new Response('Not a sponsorship event', { status: 200 });
       }
       
-      // Optionally verify the ping with Gumroad secret
-      if (env.GUMROAD_SECRET) {
-        // Gumroad doesn't send a signature, but you can check if the seller_email matches
-        // Or implement your own verification logic
+      // Only process new sponsorships
+      if (action !== 'created') {
+        console.log(`Skipping action: ${action}`);
+        return new Response(`Skipping action: ${action}`, { status: 200 });
       }
-
-      // Trigger GitHub Actions via repository_dispatch
-      const response = await fetch(
-        `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/dispatches`,
-        {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/vnd.github.v3+json',
-            'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
-            'Content-Type': 'application/json',
-            'User-Agent': 'GumroadWebhookRelay/1.0'
-          },
-          body: JSON.stringify({
-            event_type: 'gumroad_sale',
-            client_payload: {
-              email: email,
-              full_name: fullName,
-              product_name: productName,
-              sale_id: saleId,
-              purchaser_id: purchaserId,
-              price: price,
-              timestamp: new Date().toISOString()
-            }
-          })
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error('GitHub API error:', error);
-        return new Response(`GitHub API error: ${response.status}`, { status: 500 });
+      
+      const sponsor = sponsorship.sponsor;
+      const tier = sponsorship.tier;
+      
+      const sponsorLogin = sponsor.login;
+      const sponsorEmail = sponsor.email || `${sponsorLogin}@users.noreply.github.com`;
+      const tierName = tier.name;
+      const amount = tier.monthly_price_in_dollars;
+      
+      // Generate license key
+      const licenseKey = await generateLicenseKey(sponsorEmail, env.LICENSE_SECRET);
+      
+      console.log(`✅ New sponsor: ${sponsorLogin} (${tierName} - $${amount}/month)`);
+      console.log(`📧 Email: ${sponsorEmail}`);
+      console.log(`🔑 License: ${licenseKey}`);
+      
+      // Send email if SendGrid is configured
+      if (env.SENDGRID_API_KEY) {
+        await sendLicenseEmail(sponsorEmail, sponsorLogin, licenseKey, tierName, env);
       }
-
-      console.log(`✅ License triggered for ${email} (Sale: ${saleId})`);
-      return new Response('OK - License workflow triggered', { status: 200 });
+      
+      return new Response(JSON.stringify({
+        success: true,
+        sponsor: sponsorLogin,
+        email: sponsorEmail,
+        licenseKey: licenseKey,
+        tier: tierName
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
 
     } catch (error) {
       console.error('Error:', error);
@@ -92,3 +77,92 @@ export default {
     }
   }
 };
+
+async function generateLicenseKey(email, secret) {
+  const cleanEmail = email.toLowerCase().trim();
+  const secretKey = secret || 'blazeycc-pro-2026-change-this-secret';
+  
+  // Use Web Crypto API
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secretKey);
+  const messageData = encoder.encode(cleanEmail);
+  
+  const key = await crypto.subtle.importKey(
+    'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', key, messageData);
+  const hashArray = Array.from(new Uint8Array(signature));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  const part1 = hashHex.slice(0, 4).toUpperCase();
+  const part2 = hashHex.slice(4, 8).toUpperCase();
+  const part3 = hashHex.slice(8, 12).toUpperCase();
+  const part4 = hashHex.slice(12, 16).toUpperCase();
+  
+  return `${part1}-${part2}-${part3}-${part4}`;
+}
+
+async function sendLicenseEmail(email, sponsorName, licenseKey, tierName, env) {
+  const fromEmail = env.FROM_EMAIL || 'noreply@blazey.cc';
+  
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #9333ea;">🎉 Thank you for sponsoring Blazeycc!</h1>
+      <p>Hi ${sponsorName},</p>
+      <p>Welcome to <strong>${tierName}</strong>! Here is your Blazeycc Pro license key:</p>
+      <div style="background: #1a1a2e; color: #ffffff; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+        <code style="font-size: 24px; font-weight: bold; letter-spacing: 2px;">${licenseKey}</code>
+      </div>
+      <h3>How to Activate:</h3>
+      <ol>
+        <li>Open Blazeycc</li>
+        <li>Click the ⚙️ Settings button</li>
+        <li>Scroll down to "Premium Features"</li>
+        <li>Enter your email: <code>${email}</code></li>
+        <li>Enter your license key: <code>${licenseKey}</code></li>
+        <li>Click "🔑 Activate License"</li>
+      </ol>
+      <h3>Your Pro Features:</h3>
+      <ul>
+        <li>✅ No watermark on videos</li>
+        <li>✅ 4K export support</li>
+        <li>✅ Batch URL recording</li>
+        <li>✅ Scheduled recordings</li>
+      </ul>
+      <p>If you have any questions, feel free to open an issue on GitHub!</p>
+      <p>Thank you for your support! 💜</p>
+      <p>- The Blazeycc Team</p>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.SENDGRID_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        personalizations: [{
+          to: [{ email }],
+          subject: '🎉 Your Blazeycc Pro License Key!'
+        }],
+        from: { email: fromEmail, name: 'Blazeycc' },
+        content: [{
+          type: 'text/html',
+          value: htmlContent
+        }]
+      })
+    });
+    
+    if (response.ok) {
+      console.log(`✅ License key emailed to ${email}`);
+    } else {
+      const error = await response.text();
+      console.error('SendGrid error:', error);
+    }
+  } catch (error) {
+    console.error('Email error:', error.message);
+  }
+}
