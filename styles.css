@@ -785,6 +785,31 @@ body {
     cursor: pointer;
 }
 
+.scroll-speed-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--bg-card);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.scroll-speed-control label {
+    color: var(--text-muted);
+}
+
+.scroll-speed-control input[type="range"] {
+    width: 60px;
+    cursor: pointer;
+}
+
+.scroll-speed-control span {
+    min-width: 1rem;
+    text-align: center;
+}
+
 /* Quick Export Section */
 .quick-export-section {
     display: flex;

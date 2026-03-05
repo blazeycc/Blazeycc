@@ -14,7 +14,7 @@ function getWatermarkLogoPath() {
         }
     }
     // Dev mode - use local file
-    const devPath = path.join(__dirname, 'blazeycc-logo.png');
+    const devPath = path.join(__dirname, 'watermark.png');
     if (fs.existsSync(devPath)) {
         return devPath;
     }
@@ -92,8 +92,14 @@ function getFFmpegPath() {
     return ffmpegPath;
 }
 
-// Force CPU-only rendering
+// Force CPU-only rendering and disable hardware video encoding
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-accelerated-video-decode');
+app.commandLine.appendSwitch('disable-accelerated-video-encode');
 
 // Set ffmpeg path after app is ready
 app.on('ready', () => {
@@ -611,6 +617,220 @@ ipcMain.handle('select-watermark-image', async () => {
 app.whenReady().then(createWindow);
 
 // Handle uncaught exceptions to prevent crashes
+// Canvas-based recording state
+let canvasRecordingSession = null;
+
+ipcMain.handle('start-canvas-recording', async () => {
+    try {
+        // Create temp directory for frames
+        const tempDir = path.join(os.tmpdir(), `blazeycc-recording-${Date.now()}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+        
+        canvasRecordingSession = {
+            tempDir,
+            frameCount: 0,
+            startTime: Date.now(),
+            fps: 30
+        };
+        
+        console.log('Canvas recording started, temp dir:', tempDir);
+        return { success: true, sessionId: tempDir };
+    } catch (error) {
+        console.error('Failed to start canvas recording:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('capture-frame', async (event, frameData) => {
+    if (!canvasRecordingSession) {
+        return { success: false, error: 'No active recording session' };
+    }
+    
+    try {
+        const frameNumber = canvasRecordingSession.frameCount++;
+        const framePath = path.join(canvasRecordingSession.tempDir, `frame_${String(frameNumber).padStart(6, '0')}.png`);
+        
+        // frameData is base64 PNG data - use async write to avoid blocking
+        const base64Data = frameData.replace(/^data:image\/png;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        // Non-blocking async write
+        fs.promises.writeFile(framePath, buffer).catch(err => {
+            console.error('Frame write error:', err);
+        });
+        
+        return { success: true, frameNumber };
+    } catch (error) {
+        console.error('Failed to capture frame:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Capture the current webview/window frame
+ipcMain.handle('capture-webview-frame', async (event, webContentsId) => {
+    try {
+        let targetWebContents;
+        
+        // If webContentsId provided, capture that specific webContents (the webview)
+        if (webContentsId) {
+            const { webContents } = require('electron');
+            targetWebContents = webContents.fromId(webContentsId);
+        }
+        
+        // Fallback to main window
+        if (!targetWebContents && mainWindow) {
+            targetWebContents = mainWindow.webContents;
+        }
+        
+        if (!targetWebContents) {
+            return { success: false, error: 'No target to capture' };
+        }
+        
+        const image = await targetWebContents.capturePage();
+        const pngBuffer = image.toPNG();
+        const base64Data = 'data:image/png;base64,' + pngBuffer.toString('base64');
+        
+        return { success: true, data: base64Data };
+    } catch (error) {
+        console.error('Failed to capture webview frame:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, height, proSettings }) => {
+    if (!canvasRecordingSession || canvasRecordingSession.frameCount === 0) {
+        return { success: false, error: 'No frames captured' };
+    }
+    
+    try {
+        const { tempDir, frameCount, startTime, fps } = canvasRecordingSession;
+        const duration = (Date.now() - startTime) / 1000;
+        const actualFps = Math.round(frameCount / duration) || fps;
+        
+        console.log(`Canvas recording stopped: ${frameCount} frames in ${duration}s (${actualFps} fps)`);
+        
+        // Wait a bit for any pending async frame writes to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Generate output filename
+        const savePath = store.get('savePath', path.join(os.homedir(), 'Downloads'));
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const outputFormat = format || 'mp4';
+        const outputPath = path.join(savePath, `blazeycc_${timestamp}.${outputFormat}`);
+        
+        // Check Pro license
+        const license = store.get('license', null);
+        const isProLicensed = license && license.email && license.key && validateLicenseKey(license.email, license.key);
+        const settings = proSettings || {};
+        const useFastEncode = isProLicensed && settings.fastEncode;
+        const shouldAddWatermark = !isProLicensed; // Free users get watermark
+        
+        // Get watermark image path
+        const watermarkPath = getWatermarkLogoPath();
+        const hasWatermark = shouldAddWatermark && watermarkPath && fs.existsSync(watermarkPath);
+        
+        console.log('Watermark check:', { isProLicensed, shouldAddWatermark, hasWatermark, watermarkPath });
+        
+        // Build FFmpeg command
+        const inputPattern = path.join(tempDir, 'frame_%06d.png');
+        
+        return new Promise((resolve, reject) => {
+            let command = ffmpeg()
+                .input(inputPattern)
+                .inputFPS(actualFps)
+                .fps(30);
+            
+            // Add watermark input if needed
+            if (hasWatermark) {
+                command = command.input(watermarkPath);
+            }
+            
+            // Build complex filter for resize + watermark
+            if (hasWatermark && width && height) {
+                // Both resize and watermark
+                command = command.complexFilter([
+                    `[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2[scaled]`,
+                    '[scaled][1:v]overlay=10:H-h-10[out]'
+                ], 'out');
+            } else if (hasWatermark) {
+                // Watermark only (bottom-left corner)
+                command = command.complexFilter([
+                    '[0:v][1:v]overlay=10:H-h-10[out]'
+                ], 'out');
+            } else if (width && height) {
+                // Resize only
+                command = command.videoFilters([
+                    `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+                ]);
+            }
+            
+            // Output format settings
+            if (outputFormat === 'mp4') {
+                command = command
+                    .videoCodec('libx264')
+                    .outputOptions([
+                        '-pix_fmt', 'yuv420p',
+                        '-preset', useFastEncode ? 'fast' : 'medium',
+                        '-crf', quality === 'high' ? '18' : quality === 'medium' ? '23' : '28'
+                    ]);
+            } else if (outputFormat === 'webm') {
+                command = command
+                    .videoCodec('libvpx-vp9')
+                    .outputOptions([
+                        '-crf', quality === 'high' ? '20' : quality === 'medium' ? '30' : '40',
+                        '-b:v', '0'
+                    ]);
+            } else if (outputFormat === 'gif') {
+                command = command
+                    .fps(15)
+                    .outputOptions(['-loop', '0']);
+            }
+            
+            command
+                .output(outputPath)
+                .on('progress', (progress) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('ffmpeg-progress', {
+                            percent: progress.percent || 0
+                        });
+                    }
+                })
+                .on('end', () => {
+                    // Cleanup temp directory
+                    fs.rmSync(tempDir, { recursive: true, force: true });
+                    canvasRecordingSession = null;
+                    
+                    console.log('Canvas recording saved to:', outputPath);
+                    resolve({ success: true, filePath: outputPath });
+                })
+                .on('error', (err) => {
+                    console.error('FFmpeg error:', err);
+                    // Cleanup temp directory
+                    fs.rmSync(tempDir, { recursive: true, force: true });
+                    canvasRecordingSession = null;
+                    
+                    reject({ success: false, error: err.message });
+                })
+                .run();
+        });
+    } catch (error) {
+        console.error('Failed to stop canvas recording:', error);
+        if (canvasRecordingSession?.tempDir) {
+            fs.rmSync(canvasRecordingSession.tempDir, { recursive: true, force: true });
+        }
+        canvasRecordingSession = null;
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('cancel-canvas-recording', async () => {
+    if (canvasRecordingSession?.tempDir) {
+        fs.rmSync(canvasRecordingSession.tempDir, { recursive: true, force: true });
+    }
+    canvasRecordingSession = null;
+    return { success: true };
+});
+
 process.on('uncaughtException', (error) => {
     console.error('Uncaught exception:', error);
 });

@@ -62,6 +62,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setCloudConfig: (config) => ipcRenderer.invoke('set-cloud-config', config),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
     
+    // Canvas-based recording (alternative to MediaRecorder)
+    startCanvasRecording: () => ipcRenderer.invoke('start-canvas-recording'),
+    captureFrame: (frameData) => ipcRenderer.invoke('capture-frame', frameData),
+    stopCanvasRecording: (format, quality, width, height, proSettings) => 
+        ipcRenderer.invoke('stop-canvas-recording', { format, quality, width, height, proSettings }),
+    cancelCanvasRecording: () => ipcRenderer.invoke('cancel-canvas-recording'),
+    
+    // Webview frame capture
+    captureWebviewFrame: (webContentsId) => ipcRenderer.invoke('capture-webview-frame', webContentsId),
+    
     // FFmpeg progress listener
     onFFmpegProgress: (callback) => {
         ipcRenderer.on('ffmpeg-progress', (event, data) => callback(data));

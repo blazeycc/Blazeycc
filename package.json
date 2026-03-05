@@ -4,7 +4,7 @@
   "description": "Record any website as video",
   "main": "main.js",
   "scripts": {
-    "start": "electron . --no-sandbox --disable-gpu",
+    "start": "electron . --no-sandbox --disable-gpu --disable-software-rasterizer --disable-gpu-compositing",
     "start:gpu": "electron . --enable-gpu",
     "build": "electron-builder",
     "build:linux": "electron-builder --linux",
@@ -57,7 +57,7 @@
         "to": "ffmpeg"
       },
       {
-        "from": "blazeycc-logo.png",
+        "from": "watermark.png",
         "to": "watermark.png"
       }
     ],

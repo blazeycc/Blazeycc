@@ -118,6 +118,9 @@ const state = {
     autoScrollInterval: null,
     pendingRecording: null, // For preview before save
     recordingBlob: null,
+    // Canvas-based recording
+    canvasRecordingActive: false,
+    frameCaptureInterval: null,
     // Pro features
     customWatermarkSettings: { type: 'none', text: '', position: 'bottom-left', imagePath: null }
 };
@@ -142,9 +145,22 @@ async function init() {
     elements.themeToggleBtn.addEventListener('click', toggleTheme);
     
     // Auto-scroll toggle
+    const scrollSpeedControl = document.getElementById('scrollSpeedControl');
+    const scrollSpeedInput = document.getElementById('scrollSpeed');
+    const scrollSpeedValue = document.getElementById('scrollSpeedValue');
+    
     elements.autoScrollToggle.addEventListener('change', (e) => {
         state.autoScrollEnabled = e.target.checked;
+        if (scrollSpeedControl) {
+            scrollSpeedControl.style.display = e.target.checked ? 'flex' : 'none';
+        }
     });
+    
+    if (scrollSpeedInput && scrollSpeedValue) {
+        scrollSpeedInput.addEventListener('input', (e) => {
+            scrollSpeedValue.textContent = e.target.value;
+        });
+    }
     
     // Quick export buttons
     elements.quickExportBtns.forEach(btn => {
@@ -333,42 +349,16 @@ async function startRecording() {
     }
 
     try {
-        // Get the main window source for capture
-        const result = await window.electronAPI.getWebviewSource();
+        // Start canvas-based recording (avoids SIGILL crashes with MediaRecorder)
+        const result = await window.electronAPI.startCanvasRecording();
         
         if (!result.success) {
-            throw new Error(result.error || 'Failed to get source');
+            throw new Error(result.error || 'Failed to start recording');
         }
 
-        // Get stream from the window
-        state.stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: result.sourceId
-                }
-            }
-        });
-
-        // Setup recorder
-        state.recordedChunks = [];
-        state.mediaRecorder = new MediaRecorder(state.stream, {
-            mimeType: 'video/webm; codecs=vp9'
-        });
-
-        state.mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                state.recordedChunks.push(event.data);
-            }
-        };
-
-        state.mediaRecorder.onstop = handleRecordingStop;
-
-        // Start recording
-        state.mediaRecorder.start();
         state.isRecording = true;
         state.recordingStartTime = Date.now();
+        state.canvasRecordingActive = true;
 
         // Update UI
         elements.recordBtn.disabled = true;
@@ -380,6 +370,31 @@ async function startRecording() {
         // Start timer
         state.timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
+        
+        // Start frame capture loop (~15fps to reduce freeze/lag)
+        state.frameCapturePending = false;
+        // Get webview's webContentsId for direct capture
+        state.webviewWebContentsId = elements.webview.getWebContentsId ? elements.webview.getWebContentsId() : null;
+        
+        state.frameCaptureInterval = setInterval(() => {
+            if (!state.canvasRecordingActive) return;
+            if (state.frameCapturePending) return; // Skip if previous frame still processing
+            
+            state.frameCapturePending = true;
+            
+            window.electronAPI.captureWebviewFrame(state.webviewWebContentsId)
+                .then(frameResult => {
+                    if (frameResult.success && state.canvasRecordingActive) {
+                        return window.electronAPI.captureFrame(frameResult.data);
+                    }
+                })
+                .catch(err => {
+                    console.error('Frame capture error:', err);
+                })
+                .finally(() => {
+                    state.frameCapturePending = false;
+                });
+        }, 66); // ~15fps for smoother UI
         
         // Start auto-scroll if enabled
         if (state.autoScrollEnabled) {
@@ -394,21 +409,22 @@ async function startRecording() {
 }
 
 // Stop recording
-function stopRecording() {
+async function stopRecording() {
     // Stop auto-scroll
     stopAutoScroll();
     
-    if (state.mediaRecorder && state.isRecording) {
-        state.mediaRecorder.stop();
+    // Stop frame capture
+    if (state.frameCaptureInterval) {
+        clearInterval(state.frameCaptureInterval);
+        state.frameCaptureInterval = null;
+    }
+    
+    if (state.canvasRecordingActive && state.isRecording) {
+        state.canvasRecordingActive = false;
         state.isRecording = false;
         
         // Stop timer
         clearInterval(state.timerInterval);
-        
-        // Stop stream tracks
-        if (state.stream) {
-            state.stream.getTracks().forEach(track => track.stop());
-        }
         
         // Update UI
         elements.recordBtn.disabled = false;
@@ -417,6 +433,46 @@ function stopRecording() {
         elements.recordingStatus.classList.remove('recording');
         elements.statusText.textContent = 'Processing...';
         elements.recordingTimer.textContent = '';
+        
+        // Process the recording with FFmpeg
+        try {
+            const settings = getExportSettings();
+            const result = await window.electronAPI.stopCanvasRecording(
+                settings.format,
+                settings.quality,
+                settings.width,
+                settings.height,
+                settings.proSettings
+            );
+            
+            if (result.success) {
+                showNotification('Video saved: ' + result.filePath, 'success');
+                elements.statusText.textContent = 'Ready';
+                
+                // Add to history
+                const url = state.currentUrl || 'unknown';
+                const urlHost = url !== 'unknown' ? new URL(url).hostname.replace(/[^a-zA-Z0-9]/g, '-') : 'unknown';
+                const duration = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+                
+                await window.electronAPI.addHistory({
+                    url: url,
+                    title: urlHost,
+                    filePath: result.filePath,
+                    thumbnail: '',
+                    duration: duration,
+                    format: settings.format,
+                    timestamp: new Date().toISOString()
+                });
+                
+                loadHistory();
+            } else {
+                throw new Error(result.error || 'Failed to save video');
+            }
+        } catch (error) {
+            console.error('Failed to save recording:', error);
+            showNotification('Failed to save recording: ' + error.message, 'error');
+            elements.statusText.textContent = 'Ready';
+        }
     }
 }
 
@@ -800,22 +856,39 @@ async function toggleTheme() {
 function startAutoScroll() {
     if (!state.autoScrollEnabled || !state.websiteLoaded) return;
     
+    console.log('Auto-scroll started');
+    
+    // Get scroll speed from settings (default: 2)
+    const scrollSpeed = parseInt(document.getElementById('scrollSpeed')?.value) || 2;
+    
     state.autoScrollInterval = setInterval(() => {
         elements.webview.executeJavaScript(`
             (function() {
-                const scrollStep = 2;
-                const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-                if (window.scrollY < maxScroll) {
-                    window.scrollBy(0, scrollStep);
+                const scrollStep = ${scrollSpeed};
+                // Try multiple scroll containers
+                const scrollEl = document.scrollingElement || document.documentElement || document.body;
+                const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+                const maxScroll = Math.max(
+                    document.body.scrollHeight,
+                    document.documentElement.scrollHeight,
+                    document.body.offsetHeight,
+                    document.documentElement.offsetHeight
+                ) - window.innerHeight;
+                
+                if (currentScroll < maxScroll - 5) {
+                    window.scrollBy({ top: scrollStep, behavior: 'auto' });
                     return false;
                 }
                 return true;
             })()
         `).then(isAtBottom => {
             if (isAtBottom) {
+                console.log('Auto-scroll reached bottom');
                 stopAutoScroll();
             }
-        }).catch(() => {});
+        }).catch(err => {
+            console.error('Auto-scroll error:', err);
+        });
     }, 50);
 }
 
