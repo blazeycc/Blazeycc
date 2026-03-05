@@ -44,9 +44,8 @@ function generateLicenseKey(email) {
 
 const licenseKey = generateLicenseKey(email);
 
-console.log('');
 console.log('=========================================');
-console.log('   BLAZEYCC PRO LICENSE KEY');
+console.log('   BLAZEYCC PRO/PRO+ LICENSE KEY');
 console.log('=========================================');
 console.log('');
 console.log(`  Sponsor:  ${sponsorName}`);

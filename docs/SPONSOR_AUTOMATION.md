@@ -1,15 +1,15 @@
 # Automated Sponsor License Key System
 
-This guide explains how to automatically deliver Pro license keys to GitHub Sponsors.
+This guide explains how to automatically deliver Pro/Pro+ license keys to GitHub Sponsors.
 
 ## Overview
 
 When someone sponsors the blazeycc organization on GitHub:
 
 1. A webhook triggers the Cloudflare Worker
-2. The worker generates a unique license key
+2. The worker generates a unique license key and determines tier ($5/mo = Pro, $7/mo = Pro+)
 3. A GitHub Actions workflow creates an issue that @mentions the sponsor
-4. The sponsor receives a GitHub notification with their license key
+4. The sponsor receives a GitHub notification with their license key and tier info
 
 **No email required!** License keys are delivered directly via GitHub.
 

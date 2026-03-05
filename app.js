@@ -1300,11 +1300,13 @@ function showLicenseActive(email, tier) {
     const activeSection = document.getElementById('licenseActive');
     const emailDisplay = document.getElementById('licenseEmailDisplay');
     const tierDisplay = document.getElementById('licenseTierDisplay');
+    const successText = document.getElementById('licenseSuccessText');
     
     if (inactiveSection) inactiveSection.style.display = 'none';
     if (activeSection) activeSection.style.display = 'block';
     if (emailDisplay) emailDisplay.textContent = email;
     if (tierDisplay) tierDisplay.textContent = tier === 'pro+' ? 'Pro+' : 'Pro';
+    if (successText) successText.textContent = tier === 'pro+' ? '✅ Pro+ License Active' : '✅ Pro License Active';
 }
 
 function showLicenseInactive() {
