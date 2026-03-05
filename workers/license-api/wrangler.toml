@@ -11,11 +11,10 @@ binding = "DB"
 database_name = "blazeycc-licenses"
 database_id = "3112b81a-8a4d-410e-80db-623c2fe00087"
 
-# R2 Cloud Storage - Uncomment after enabling R2 in Cloudflare Dashboard
-# and creating bucket named "blazeycc-recordings"
-# [[r2_buckets]]
-# binding = "STORAGE"
-# bucket_name = "blazeycc-recordings"
+# R2 Cloud Storage
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "blazeycc-recordings"
 
 # Secrets (set via wrangler secret put):
 # - LICENSE_SECRET: Your HMAC secret for generating keys
