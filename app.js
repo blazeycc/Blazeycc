@@ -247,8 +247,12 @@ async function init() {
     // License event listeners
     document.getElementById('activateLicenseBtn')?.addEventListener('click', activateLicense);
     document.getElementById('deactivateLicenseBtn')?.addEventListener('click', deactivateLicense);
+    document.getElementById('redeemPromoBtn')?.addEventListener('click', redeemPromoCode);
 
     showNotification('Ready! Enter a URL to get started.', 'info');
+    
+    // Track app start
+    window.electronAPI.trackUsage('app_start', {});
 }
 
 // Get current export settings
@@ -1006,6 +1010,45 @@ async function deactivateLicense() {
         if (keyInput) keyInput.value = '';
     } catch (error) {
         showNotification('Error deactivating license', 'error');
+    }
+}
+
+async function redeemPromoCode() {
+    const emailInput = document.getElementById('licenseEmail');
+    const promoInput = document.getElementById('promoCode');
+    
+    const email = emailInput?.value?.trim();
+    const code = promoInput?.value?.trim();
+    
+    if (!email) {
+        showNotification('Please enter your email first', 'error');
+        emailInput?.focus();
+        return;
+    }
+    
+    if (!code) {
+        showNotification('Please enter a promo code', 'error');
+        promoInput?.focus();
+        return;
+    }
+    
+    try {
+        showNotification('Redeeming promo code...', 'info');
+        const result = await window.electronAPI.redeemPromo(email, code);
+        
+        if (result.success) {
+            isProLicensed = true;
+            showLicenseActive(email);
+            unlockProFeatures();
+            showNotification('🎉 ' + result.message, 'success');
+            
+            // Clear promo input
+            if (promoInput) promoInput.value = '';
+        } else {
+            showNotification(result.message || 'Invalid promo code', 'error');
+        }
+    } catch (error) {
+        showNotification('Error redeeming promo code: ' + error.message, 'error');
     }
 }
 

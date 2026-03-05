@@ -363,6 +363,10 @@ ipcMain.handle('save-video', async (event, { filename, data, format, quality, wi
                     if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send('ffmpeg-progress', { percent: 100, done: true });
                     }
+                    
+                    // Track video creation
+                    trackUsage('video_created', { format, quality, isProLicensed });
+                    
                     resolve({ success: true, path: outputPath });
                 })
                 .on('error', (err) => {
@@ -465,6 +469,7 @@ ipcMain.handle('set-theme', async (event, theme) => {
 // License management
 const crypto = require('crypto');
 const LICENSE_SECRET = process.env.LICENSE_SECRET || '4f6fab93b5f0bfb47f3431ab19b230994e94cc946d479e27cf82b1b85c7aaee3';
+const LICENSE_API_URL = 'https://blazeycc-license.kennethhy-me.workers.dev';
 
 function generateExpectedKey(email) {
     const normalizedEmail = email.toLowerCase().trim();
@@ -488,11 +493,79 @@ function validateLicenseKey(email, key) {
            normalizedKey.slice(0, 16) === normalizedExpected.slice(0, 16);
 }
 
+// Online license validation (checks revocation)
+async function validateLicenseOnline(email, licenseKey) {
+    try {
+        const response = await fetch(`${LICENSE_API_URL}/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, licenseKey })
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Online validation failed:', error);
+        // Fallback to local validation if offline
+        return { valid: validateLicenseKey(email, licenseKey), offline: true };
+    }
+}
+
+// Track usage (video created, export, etc.)
+async function trackUsage(action, metadata = {}) {
+    try {
+        const license = store.get('license', null);
+        await fetch(`${LICENSE_API_URL}/track`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: license?.email || null,
+                licenseKey: license?.key || null,
+                action,
+                metadata: {
+                    ...metadata,
+                    platform: process.platform,
+                    appVersion: app.getVersion()
+                }
+            })
+        });
+    } catch (error) {
+        // Silent fail - don't interrupt user experience
+        console.error('Usage tracking failed:', error);
+    }
+}
+
+// Redeem promo code
+async function redeemPromoCode(email, code) {
+    try {
+        const response = await fetch(`${LICENSE_API_URL}/redeem`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        return await response.json();
+    } catch (error) {
+        return { error: 'Network error', message: error.message };
+    }
+}
+
 ipcMain.handle('get-license', async () => {
     const license = store.get('license', null);
     if (license && license.email && license.key) {
-        const isValid = validateLicenseKey(license.email, license.key);
-        return { ...license, isValid };
+        // Local validation first (fast)
+        const localValid = validateLicenseKey(license.email, license.key);
+        if (!localValid) {
+            return { email: license.email, key: license.key, isValid: false };
+        }
+        
+        // Online validation (check revocation) - async, don't block
+        validateLicenseOnline(license.email, license.key).then(result => {
+            if (result.valid === false && !result.offline) {
+                // License was revoked - clear it
+                store.delete('license');
+            }
+        }).catch(() => {});
+        
+        return { ...license, isValid: true };
     }
     return { email: null, key: null, isValid: false };
 });
@@ -502,24 +575,70 @@ ipcMain.handle('set-license', async (event, { email, key }) => {
         return { success: false, message: 'Email and license key are required' };
     }
     
+    // Local validation first
     const isValid = validateLicenseKey(email, key);
-    if (isValid) {
-        store.set('license', {
-            email,
-            key,
-            activatedAt: new Date().toISOString()
-        });
-        return { success: true, message: 'Pro license activated!' };
+    if (!isValid) {
+        return { success: false, message: 'Invalid license key. Make sure email matches your sponsor email.' };
     }
-    return { success: false, message: 'Invalid license key. Make sure email matches your sponsor email.' };
+    
+    // Online validation to check revocation
+    const onlineResult = await validateLicenseOnline(email, key);
+    if (onlineResult.valid === false && !onlineResult.offline) {
+        return { success: false, message: onlineResult.reason || 'License has been revoked' };
+    }
+    
+    store.set('license', {
+        email,
+        key,
+        activatedAt: new Date().toISOString()
+    });
+    
+    // Track license activation
+    trackUsage('license_activated');
+    
+    return { success: true, message: 'Pro license activated!' };
 });
 
 ipcMain.handle('validate-license', async (event, { email, key }) => {
-    return validateLicenseKey(email, key);
+    const localValid = validateLicenseKey(email, key);
+    if (!localValid) return false;
+    
+    // Check online if local passes
+    const onlineResult = await validateLicenseOnline(email, key);
+    return onlineResult.valid !== false;
 });
 
 ipcMain.handle('clear-license', async () => {
+    trackUsage('license_deactivated');
     store.delete('license');
+    return { success: true };
+});
+
+// Promo code redemption
+ipcMain.handle('redeem-promo', async (event, { email, code }) => {
+    if (!email || !code) {
+        return { success: false, message: 'Email and promo code are required' };
+    }
+    
+    const result = await redeemPromoCode(email, code);
+    
+    if (result.success && result.licenseKey) {
+        // Auto-activate the license
+        store.set('license', {
+            email: result.email,
+            key: result.licenseKey,
+            activatedAt: new Date().toISOString(),
+            promoCode: code
+        });
+        return { success: true, message: 'Promo code redeemed! Pro license activated.', licenseKey: result.licenseKey };
+    }
+    
+    return { success: false, message: result.error || result.message || 'Invalid promo code' };
+});
+
+// Track usage from renderer
+ipcMain.handle('track-usage', async (event, { action, metadata }) => {
+    await trackUsage(action, metadata);
     return { success: true };
 });
 

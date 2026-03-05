@@ -1142,6 +1142,43 @@ body {
     color: var(--text-muted);
 }
 
+.promo-divider {
+    display: flex;
+    align-items: center;
+    margin: 1rem 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.promo-divider::before,
+.promo-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.promo-divider span {
+    padding: 0 0.75rem;
+}
+
+.promo-input {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+.btn-promo {
+    width: 100%;
+    margin-bottom: 0.75rem;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border: none;
+}
+
+.btn-promo:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+}
+
 .btn-sponsor {
     display: block;
     width: 100%;

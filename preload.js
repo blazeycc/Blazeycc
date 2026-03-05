@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     validateLicense: (email, key) => ipcRenderer.invoke('validate-license', { email, key }),
     clearLicense: () => ipcRenderer.invoke('clear-license'),
     isProLicensed: () => ipcRenderer.invoke('is-pro-licensed'),
+    redeemPromo: (email, code) => ipcRenderer.invoke('redeem-promo', { email, code }),
+    trackUsage: (action, metadata) => ipcRenderer.invoke('track-usage', { action, metadata }),
     
     // Batch recordings (Pro)
     getBatchUrls: () => ipcRenderer.invoke('get-batch-urls'),
