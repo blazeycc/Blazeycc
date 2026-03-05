@@ -1,75 +1,184 @@
-# Blazeycc
+<p align="center">
+  <img src="build/icon.png" alt="Blazeycc Logo" width="128" height="128">
+</p>
 
-**Record any website as video** - Capture demos, tutorials, and presentations as high-quality MP4, WebM, or GIF.
+<h1 align="center">Blazeycc</h1>
 
-![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
+<p align="center">
+  <strong>Record any website as video</strong><br>
+  Capture demos, tutorials, and presentations as high-quality MP4, WebM, or GIF
+</p>
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-💜-purple.svg)](https://github.com/sponsors/theKennethy)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-☕-orange.svg)](https://ko-fi.com/thekennethy)
+<p align="center">
+  <a href="https://github.com/blazeycc/Blazeycc/releases/latest"><img src="https://img.shields.io/github/v/release/blazeycc/Blazeycc?style=flat-square&color=blue" alt="Release"></a>
+  <a href="https://github.com/blazeycc/Blazeycc/releases"><img src="https://img.shields.io/github/downloads/blazeycc/Blazeycc/total?style=flat-square&color=green" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square" alt="Platform">
+</p>
 
-## Features
+<p align="center">
+  <a href="https://github.com/sponsors/theKennethy"><img src="https://img.shields.io/badge/Sponsor-💜-ea4aaa?style=for-the-badge" alt="Sponsor"></a>
+</p>
 
-- 🌐 **Webview Capture** - Record any website directly, no screen sharing needed
-- 🎬 **Multiple Formats** - Export as MP4, WebM, or animated GIF
-- 📱 **23 Platform Presets** - Optimized for YouTube, Instagram, TikTok, Twitter, and more
-- 📜 **Auto-Scroll** - Automatically scroll through long pages while recording
-- 👁️ **Preview Before Save** - Review recordings before exporting
-- 🔖 **Bookmarks & History** - Save URLs and access recording history
-- 🌙 **Dark & Light Mode** - Theme support with system sync
+---
 
-### 🚀 Pro Features
+## 📥 Download
 
-Support the project to unlock premium features:
-
-- 🎨 **Watermark Removal** - Clean exports without branding
-- 📺 **4K Export** - Ultra-high quality 3840×2160 output
-- ☁️ **Cloud History Sync** - Access your recording history across devices
-- 📋 **Batch Recording** - Record multiple URLs in sequence
-- ⏰ **Scheduled Recordings** - Set up automated captures
-
-## Download
-
-Download the latest release for your platform:
-
-- **Windows**: [Blazeycc.exe](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-Setup.exe) | [Portable](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-Portable.exe)
-- **macOS**: [Blazeycc.dmg](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.dmg) | [ARM64](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-arm64.dmg)
-- **Linux**: [AppImage](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.AppImage) | [.deb](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.deb) | [.rpm](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.rpm)
+<table>
+<tr>
+<td align="center"><b>Windows</b></td>
+<td align="center"><b>macOS</b></td>
+<td align="center"><b>Linux</b></td>
+</tr>
+<tr>
+<td align="center">
+<a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-Setup.exe">Installer (.exe)</a><br>
+<a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-Portable.exe">Portable</a>
+</td>
+<td align="center">
+<a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.dmg">Intel (.dmg)</a><br>
+<a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-arm64.dmg">Apple Silicon</a>
+</td>
+<td align="center">
+<a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.AppImage">AppImage</a><br>
+<a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.deb">.deb</a> · <a href="https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.rpm">.rpm</a>
+</td>
+</tr>
+</table>
 
 > **Note:** Linux users may need to run with `--no-sandbox` flag. macOS users: right-click → Open on first launch.
 
-## Support the Project
+---
 
-If you find Blazeycc useful, consider supporting its development:
+## ✨ Features
 
-- 💜 [**GitHub Sponsors**](https://github.com/sponsors/theKennethy) - $5/month gets your name in credits
-- ☕ [**Ko-fi**](https://ko-fi.com/thekennethy) - One-time support
+| Feature | Free | Pro ($5/mo) | Pro+ ($7/mo) |
+|---------|:----:|:-----------:|:------------:|
+| Record any URL as video | ✅ | ✅ | ✅ |
+| Export to MP4, WebM, GIF | ✅ | ✅ | ✅ |
+| 23 social media presets | ✅ | ✅ | ✅ |
+| Screenshot capture | ✅ | ✅ | ✅ |
+| Bookmarks & history | ✅ | ✅ | ✅ |
+| Auto-scroll recording | ✅ | ✅ | ✅ |
+| Dark & light themes | ✅ | ✅ | ✅ |
+| **Remove watermark** | ❌ | ✅ | ✅ |
+| **4K export (3840×2160)** | ❌ | ✅ | ✅ |
+| **Cloud history sync** | ❌ | ✅ | ✅ |
+| **Custom watermarks** | ❌ | ✅ | ✅ |
+| **Batch recording** | ❌ | ✅ | ✅ |
+| **Scheduled recordings** | ❌ | ✅ | ✅ |
+| **5GB cloud storage** | ❌ | ❌ | ✅ |
+| **Shareable video links** | ❌ | ❌ | ✅ |
+| **Cloud preview/streaming** | ❌ | ❌ | ✅ |
 
-## Development
+---
+
+## 🎯 Perfect For
+
+- **Content Creators** — Capture website animations, demos, and tutorials
+- **Social Media Managers** — Record in the perfect format for any platform
+- **Educators** — Create web-based tutorials and walkthroughs
+- **Product Teams** — Document features and create product demos
+- **Developers** — Record bug reproductions and UI interactions
+
+---
+
+## 🚀 Quick Start
+
+1. **Download** the app for your platform above
+2. **Enter a URL** and click "Go"
+3. **Click Record** to start capturing
+4. **Export** as MP4, WebM, or GIF
+
+### Platform Presets
+
+Choose from 23 optimized presets for social media:
+
+`YouTube` `Instagram Reels` `TikTok` `Twitter/X` `LinkedIn` `Facebook` `Snapchat` `Pinterest` `Discord` `Twitch` and more...
+
+---
+
+## 💜 Support Development
+
+Unlock Pro features and support ongoing development:
+
+<table>
+<tr>
+<td align="center" width="50%">
+<h3>☕ Pro — $5/mo</h3>
+<p>Remove watermarks, 4K export, cloud sync, batch recording, custom watermarks, scheduled recordings</p>
+<a href="https://github.com/sponsors/theKennethy">Become a Sponsor →</a>
+</td>
+<td align="center" width="50%">
+<h3>☁️ Pro+ — $7/mo</h3>
+<p>Everything in Pro, plus 5GB cloud storage, shareable links, cloud preview, export to YouTube/Vimeo</p>
+<a href="https://github.com/sponsors/theKennethy">Become a Sponsor →</a>
+</td>
+</tr>
+</table>
+
+**How to activate:** Settings → Enter your sponsor email → Click "Activate License"
+
+---
+
+## 🛠️ Development
 
 ```bash
+# Clone the repo
+git clone https://github.com/blazeycc/Blazeycc.git
+cd Blazeycc
+
 # Install dependencies
 npm install
 
 # Run in development
 npm start
 
-# Build for Linux
-npm run build:linux
-
-# Build for Windows
-npm run build:win
-
-# Build for macOS (via GitHub Actions)
-# Push to trigger or run manually in Actions tab
+# Build for your platform
+npm run build:linux   # Linux (AppImage, deb, rpm)
+npm run build:win     # Windows (exe, portable)
+npm run build:mac     # macOS (requires macOS)
 ```
 
-## Tech Stack
+### Tech Stack
 
-- Electron 40
-- FFmpeg (via ffmpeg-static)
-- MediaRecorder API with webview capture
+- **Electron 40** — Cross-platform desktop framework
+- **FFmpeg** — Video encoding via ffmpeg-static
+- **MediaRecorder API** — Webview capture
+- **Cloudflare Workers** — License API & cloud storage
 
-## License
+### Project Structure
 
-GPL-3.0 License - see [LICENSE](LICENSE) for details.
+```
+├── main.js          # Electron main process
+├── app.js           # Renderer logic
+├── index.html       # Main UI
+├── preload.js       # IPC bridge
+├── workers/         # Cloudflare Workers (license API)
+├── webhook-relay/   # GitHub Sponsors webhook handler
+└── docs/            # Marketing site (blazeycc.com)
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+GPL-3.0 License — see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/blazeycc">blazeycc</a>
+</p>
