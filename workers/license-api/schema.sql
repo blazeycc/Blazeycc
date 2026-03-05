@@ -2,9 +2,13 @@
 CREATE TABLE IF NOT EXISTS allowed_emails (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
+    tier TEXT DEFAULT 'pro',  -- 'pro' ($5/mo) or 'pro+' ($7/mo)
     note TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Migration: Add tier column if it doesn't exist
+-- ALTER TABLE allowed_emails ADD COLUMN tier TEXT DEFAULT 'pro';
 
 -- Index for fast email lookups
 CREATE INDEX IF NOT EXISTS idx_email ON allowed_emails(email);

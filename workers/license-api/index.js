@@ -185,13 +185,13 @@ async function handleGetLicense(request, env, corsHeaders) {
     
     const normalizedEmail = email.toLowerCase().trim();
     
-    // Check if allowed in DB
-    const isAllowedInDB = await env.DB.prepare(
-        'SELECT email FROM allowed_emails WHERE email = ?'
+    // Check if allowed in DB (with tier)
+    const allowedEntry = await env.DB.prepare(
+        'SELECT email, tier FROM allowed_emails WHERE email = ?'
     ).bind(normalizedEmail).first();
     
     // Check GitHub sponsors
-    const isSponsor = isAllowedInDB || await verifySponsor(normalizedEmail, env.GITHUB_TOKEN, env.GITHUB_USERNAME);
+    const isSponsor = allowedEntry || await verifySponsor(normalizedEmail, env.GITHUB_TOKEN, env.GITHUB_USERNAME);
     
     if (!isSponsor) {
         return jsonResponse({ 
@@ -214,10 +214,13 @@ async function handleGetLicense(request, env, corsHeaders) {
         }, 403, corsHeaders);
     }
     
+    // Get tier from DB entry, or default to 'pro' for GitHub sponsors not in DB
+    const tier = allowedEntry?.tier || 'pro';
+    
     // Log analytics
     await logAnalytics(env.DB, 'license_generated', normalizedEmail, licenseKey, request);
     
-    return jsonResponse({ success: true, email: normalizedEmail, licenseKey }, 200, corsHeaders);
+    return jsonResponse({ success: true, email: normalizedEmail, licenseKey, tier }, 200, corsHeaders);
 }
 
 async function handleValidateLicense(request, env, corsHeaders) {
@@ -243,9 +246,18 @@ async function handleValidateLicense(request, env, corsHeaders) {
     const expectedKey = await generateLicenseKey(normalizedEmail, env.LICENSE_SECRET);
     const valid = licenseKey === expectedKey;
     
+    // Get tier from DB
+    let tier = 'pro';  // Default tier
+    if (valid) {
+        const allowedEntry = await env.DB.prepare(
+            'SELECT tier FROM allowed_emails WHERE email = ?'
+        ).bind(normalizedEmail).first();
+        tier = allowedEntry?.tier || 'pro';
+    }
+    
     await logAnalytics(env.DB, valid ? 'license_check_valid' : 'license_check_invalid', normalizedEmail, licenseKey, request);
     
-    return jsonResponse({ valid }, 200, corsHeaders);
+    return jsonResponse({ valid, tier }, 200, corsHeaders);
 }
 
 async function handleRedeemPromo(request, env, corsHeaders) {
@@ -288,8 +300,9 @@ async function handleRedeemPromo(request, env, corsHeaders) {
     }
     
     // Redeem: add to allowed emails and record redemption
+    // Promo codes default to 'pro' tier (can be updated later via admin)
     await env.DB.batch([
-        env.DB.prepare('INSERT OR REPLACE INTO allowed_emails (email, note) VALUES (?, ?)').bind(normalizedEmail, `Promo: ${normalizedCode}`),
+        env.DB.prepare('INSERT OR REPLACE INTO allowed_emails (email, tier, note) VALUES (?, ?, ?)').bind(normalizedEmail, 'pro', `Promo: ${normalizedCode}`),
         env.DB.prepare('INSERT INTO promo_redemptions (promo_code_id, email) VALUES (?, ?)').bind(promo.id, normalizedEmail),
         env.DB.prepare('UPDATE promo_codes SET current_uses = current_uses + 1 WHERE id = ?').bind(promo.id)
     ]);
@@ -302,6 +315,7 @@ async function handleRedeemPromo(request, env, corsHeaders) {
         success: true, 
         email: normalizedEmail, 
         licenseKey,
+        tier: 'pro',
         discount: promo.discount_percent
     }, 200, corsHeaders);
 }
@@ -479,15 +493,16 @@ async function handleAdminEmailAdd(request, env, corsHeaders) {
     const authError = requireAdmin(request, env, corsHeaders);
     if (authError) return authError;
     
-    const { email, note } = await request.json();
+    const { email, note, tier } = await request.json();
     if (!email) return jsonResponse({ error: 'Email required' }, 400, corsHeaders);
     
     const normalizedEmail = email.toLowerCase().trim();
+    const licenseTier = tier || 'pro';  // Default to 'pro' if not specified
     await env.DB.prepare(
-        'INSERT OR REPLACE INTO allowed_emails (email, note) VALUES (?, ?)'
-    ).bind(normalizedEmail, note || null).run();
+        'INSERT OR REPLACE INTO allowed_emails (email, tier, note) VALUES (?, ?, ?)'
+    ).bind(normalizedEmail, licenseTier, note || null).run();
     
-    return jsonResponse({ success: true, email: normalizedEmail }, 200, corsHeaders);
+    return jsonResponse({ success: true, email: normalizedEmail, tier: licenseTier }, 200, corsHeaders);
 }
 
 async function handleAdminEmailRemove(request, env, corsHeaders) {
@@ -508,7 +523,7 @@ async function handleAdminEmailList(request, env, corsHeaders) {
     if (authError) return authError;
     
     const result = await env.DB.prepare(
-        'SELECT email, note, created_at FROM allowed_emails ORDER BY created_at DESC'
+        'SELECT email, tier, note, created_at FROM allowed_emails ORDER BY created_at DESC'
     ).all();
     
     return jsonResponse({ success: true, emails: result.results }, 200, corsHeaders);

@@ -46,7 +46,8 @@ Sponsor on GitHub → GitHub webhook → Cloudflare Worker → GitHub Actions �
 
 1. Go to [github.com/sponsors/blazeycc/dashboard](https://github.com/sponsors/blazeycc/dashboard)
 2. Create tier(s):
-   - **Blazeycc Pro** ($7/month): Include features and note that license key will be delivered via GitHub notification
+   - **Blazeycc Pro** ($5/month): Unlock Pro features (no watermark, 4K, batch recording, etc.)
+   - **Blazeycc Pro+** ($7/month): All Pro features + 5GB cloud storage, shareable links
 
 ### 5. Test the Setup
 

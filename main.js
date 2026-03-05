@@ -890,23 +890,26 @@ ipcMain.handle('set-license', async (event, { email, key, tier }) => {
         return { success: false, message: 'Invalid license key. Make sure email matches your sponsor email.' };
     }
     
-    // Online validation to check revocation
+    // Online validation to check revocation and get tier
     const onlineResult = await validateLicenseOnline(email, key);
     if (onlineResult.valid === false && !onlineResult.offline) {
         return { success: false, message: onlineResult.reason || 'License has been revoked' };
     }
     
+    // Use tier from API if available, otherwise use provided tier or default to 'pro'
+    const licenseTier = onlineResult.tier || tier || 'pro';
+    
     store.set('license', {
         email,
         key,
-        tier: tier || 'pro',  // 'pro' or 'pro+'
+        tier: licenseTier,  // 'pro' ($5/mo) or 'pro+' ($7/mo)
         activatedAt: new Date().toISOString()
     });
     
     // Track license activation
-    trackUsage('license_activated', { tier: tier || 'pro' });
+    trackUsage('license_activated', { tier: licenseTier });
     
-    return { success: true, message: tier === 'pro+' ? 'Pro+ license activated!' : 'Pro license activated!' };
+    return { success: true, message: licenseTier === 'pro+' ? 'Pro+ license activated!' : 'Pro license activated!' };
 });
 
 ipcMain.handle('validate-license', async (event, { email, key }) => {

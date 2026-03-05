@@ -48,22 +48,26 @@ export default {
       const tierName = tier.name;
       const amount = tier.monthly_price_in_dollars;
       
+      // Determine license tier based on amount: $5/mo = pro, $7+/mo = pro+
+      const licenseTier = amount >= 7 ? 'pro+' : 'pro';
+      
       // Generate license key
       const licenseKey = await generateLicenseKey(sponsorEmail, env.LICENSE_SECRET);
       
-      console.log(`✅ New sponsor: ${sponsorLogin} (${tierName} - $${amount}/month)`);
+      console.log(`✅ New sponsor: ${sponsorLogin} (${tierName} - $${amount}/month) → ${licenseTier}`);
       console.log(`🔑 License: ${licenseKey}`);
       
       // Trigger GitHub Actions to create issue with license key
       if (env.GITHUB_TOKEN) {
-        await triggerGitHubWorkflow(sponsorLogin, sponsorEmail, licenseKey, tierName, amount, env);
+        await triggerGitHubWorkflow(sponsorLogin, sponsorEmail, licenseKey, tierName, amount, licenseTier, env);
       }
       
       return new Response(JSON.stringify({
         success: true,
         sponsor: sponsorLogin,
         licenseKey: licenseKey,
-        tier: tierName,
+        tier: licenseTier,
+        tierName: tierName,
         delivery: 'GitHub Issue'
       }), {
         status: 200,
@@ -102,7 +106,7 @@ async function generateLicenseKey(email, secret) {
   return `${part1}-${part2}-${part3}-${part4}`;
 }
 
-async function triggerGitHubWorkflow(sponsorLogin, sponsorEmail, licenseKey, tierName, amount, env) {
+async function triggerGitHubWorkflow(sponsorLogin, sponsorEmail, licenseKey, tierName, amount, licenseTier, env) {
   const response = await fetch('https://api.github.com/repos/blazeycc/Blazeycc/dispatches', {
     method: 'POST',
     headers: {
@@ -118,7 +122,8 @@ async function triggerGitHubWorkflow(sponsorLogin, sponsorEmail, licenseKey, tie
         sponsor_email: sponsorEmail,
         license_key: licenseKey,
         tier_name: tierName,
-        amount: amount
+        amount: amount,
+        license_tier: licenseTier  // 'pro' or 'pro+'
       }
     })
   });
