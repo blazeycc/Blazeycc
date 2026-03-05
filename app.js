@@ -504,7 +504,9 @@ async function stopRecording() {
                 await window.electronAPI.addHistory({
                     url: url,
                     title: urlHost,
-                    filePath: result.filePath,
+                    path: result.filePath,
+                    filename: result.filePath.split('/').pop().split('\\').pop(),
+                    preset: settings.preset || 'Custom',
                     thumbnail: '',
                     duration: duration,
                     format: settings.format,
@@ -773,11 +775,13 @@ function renderHistory() {
         
         const date = new Date(record.recordedAt).toLocaleString();
         const duration = record.duration ? `${Math.floor(record.duration / 60)}:${(record.duration % 60).toString().padStart(2, '0')}` : 'N/A';
+        const filename = record.filename || (record.path ? record.path.split('/').pop().split('\\').pop() : 'Unknown');
+        const preset = record.preset || 'Custom';
         
         item.innerHTML = `
             <div class="history-info">
-                <span class="history-filename">${record.filename}</span>
-                <span class="history-meta">${record.preset} • ${record.format?.toUpperCase() || 'MP4'} • ${duration}</span>
+                <span class="history-filename">${filename}</span>
+                <span class="history-meta">${preset} • ${record.format?.toUpperCase() || 'MP4'} • ${duration}</span>
                 <span class="history-date">${date}</span>
             </div>
             <div class="history-actions">
