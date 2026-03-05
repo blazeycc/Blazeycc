@@ -909,7 +909,7 @@ ipcMain.handle('set-license', async (event, { email, key, tier }) => {
     // Track license activation
     trackUsage('license_activated', { tier: licenseTier });
     
-    return { success: true, message: licenseTier === 'pro+' ? 'Pro+ license activated!' : 'Pro license activated!' };
+    return { success: true, tier: licenseTier, message: licenseTier === 'pro+' ? 'Pro+ license activated!' : 'Pro license activated!' };
 });
 
 ipcMain.handle('validate-license', async (event, { email, key }) => {

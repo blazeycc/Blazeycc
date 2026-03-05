@@ -1405,8 +1405,13 @@ async function activateLicense() {
         const result = await window.electronAPI.setLicense(email, key);
         if (result.success) {
             isProLicensed = true;
-            showLicenseActive(email);
+            licenseTier = result.tier || 'pro';
+            isProPlusLicensed = licenseTier === 'pro+';
+            showLicenseActive(email, licenseTier);
             unlockProFeatures();
+            if (isProPlusLicensed) {
+                unlockProPlusFeatures();
+            }
             showNotification('🎉 ' + result.message, 'success');
         } else {
             showNotification(result.message || 'Invalid license key', 'error');
