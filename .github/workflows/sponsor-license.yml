@@ -18,14 +18,14 @@ on:
 jobs:
   deliver-license:
     runs-on: ubuntu-latest
-    env:
-      LICENSE_SECRET: ${{ secrets.LICENSE_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         
       - name: Get Sponsor Info
         id: sponsor
+        env:
+          LICENSE_SECRET: ${{ secrets.LICENSE_SECRET }}
         run: |
           if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
             SPONSOR_LOGIN="${{ github.event.client_payload.sponsor_login }}"
@@ -40,7 +40,7 @@ jobs:
             AMOUNT="7"
             # Generate license key for manual trigger
             SECRET="${LICENSE_SECRET}"
-            SECRET=${SECRET:-'blazeycc-pro-2026-change-this-secret'}
+            SECRET=${SECRET:-'4f6fab93b5f0bfb47f3431ab19b230994e94cc946d479e27cf82b1b85c7aaee3'}
             HASH=$(echo -n "$SPONSOR_EMAIL" | openssl dgst -sha256 -hmac "$SECRET" | cut -d" " -f2)
             LICENSE_KEY=$(echo "${HASH:0:16}" | tr "[:lower:]" "[:upper:]" | sed "s/\(....\)/\1-/g" | sed "s/-$//")
           fi

@@ -79,7 +79,7 @@ export default {
 
 async function generateLicenseKey(email, secret) {
   const cleanEmail = email.toLowerCase().trim();
-  const secretKey = secret || 'blazeycc-pro-2026-change-this-secret';
+  const secretKey = secret || '4f6fab93b5f0bfb47f3431ab19b230994e94cc946d479e27cf82b1b85c7aaee3';
   
   // Use Web Crypto API
   const encoder = new TextEncoder();

@@ -27,7 +27,7 @@ if (!email) {
 }
 
 // Get secret from environment
-const secret = process.env.LICENSE_SECRET || 'blazeycc-pro-2026-change-this-secret';
+const secret = process.env.LICENSE_SECRET || '4f6fab93b5f0bfb47f3431ab19b230994e94cc946d479e27cf82b1b85c7aaee3';
 
 // Generate license key
 function generateLicenseKey(email) {
