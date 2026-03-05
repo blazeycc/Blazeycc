@@ -410,12 +410,17 @@ async function startRecording() {
         
         // Start frame capture loop (~15fps to reduce freeze/lag)
         state.frameCapturePending = false;
+        state.droppedFrames = 0;
         // Get webview's webContentsId for direct capture
         state.webviewWebContentsId = elements.webview.getWebContentsId ? elements.webview.getWebContentsId() : null;
         
         state.frameCaptureInterval = setInterval(() => {
             if (!state.canvasRecordingActive) return;
-            if (state.frameCapturePending) return; // Skip if previous frame still processing
+            if (state.frameCapturePending) {
+                // Track dropped frames but don't block - just skip this interval
+                state.droppedFrames++;
+                return;
+            }
             
             state.frameCapturePending = true;
             
@@ -449,6 +454,11 @@ async function startRecording() {
 async function stopRecording() {
     // Stop auto-scroll
     stopAutoScroll();
+    
+    // Log dropped frames if any
+    if (state.droppedFrames > 0) {
+        console.log(`Recording had ${state.droppedFrames} dropped frames due to processing lag`);
+    }
     
     // Stop frame capture
     if (state.frameCaptureInterval) {

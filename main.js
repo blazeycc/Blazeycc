@@ -1069,6 +1069,7 @@ app.whenReady().then(createWindow);
 // Handle uncaught exceptions to prevent crashes
 // Canvas-based recording state
 let canvasRecordingSession = null;
+let pendingFrameWrites = 0;
 
 ipcMain.handle('start-canvas-recording', async () => {
     try {
@@ -1076,6 +1077,7 @@ ipcMain.handle('start-canvas-recording', async () => {
         const tempDir = path.join(os.tmpdir(), `blazeycc-recording-${Date.now()}`);
         fs.mkdirSync(tempDir, { recursive: true });
         
+        pendingFrameWrites = 0;
         canvasRecordingSession = {
             tempDir,
             frameCount: 0,
@@ -1104,10 +1106,14 @@ ipcMain.handle('capture-frame', async (event, frameData) => {
         const base64Data = frameData.replace(/^data:image\/png;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
         
-        // Non-blocking async write
-        fs.promises.writeFile(framePath, buffer).catch(err => {
-            console.error('Frame write error:', err);
-        });
+        // Track pending writes
+        pendingFrameWrites++;
+        fs.promises.writeFile(framePath, buffer)
+            .then(() => pendingFrameWrites--)
+            .catch(err => {
+                pendingFrameWrites--;
+                console.error('Frame write error:', err);
+            });
         
         return { success: true, frameNumber };
     } catch (error) {
@@ -1159,8 +1165,14 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
         
         console.log(`Canvas recording stopped: ${frameCount} frames in ${duration}s (${actualFps} fps)`);
         
-        // Wait a bit for any pending async frame writes to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for all pending frame writes to complete (max 10 seconds)
+        let waitTime = 0;
+        while (pendingFrameWrites > 0 && waitTime < 10000) {
+            console.log(`Waiting for ${pendingFrameWrites} pending frame writes...`);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            waitTime += 200;
+        }
+        console.log('All frame writes completed');
         
         // Generate output filename
         const savePath = store.get('savePath', path.join(os.homedir(), 'Downloads'));
