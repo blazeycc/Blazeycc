@@ -18,12 +18,13 @@
 - 🔖 **Bookmarks & History** - Save URLs and access recording history
 - 🌙 **Dark & Light Mode** - Theme support with system sync
 
-### 🚀 Pro Features (Coming Soon)
+### 🚀 Pro Features
 
 Support the project to unlock premium features:
 
 - 🎨 **Watermark Removal** - Clean exports without branding
 - 📺 **4K Export** - Ultra-high quality 3840×2160 output
+- ☁️ **Cloud History Sync** - Access your recording history across devices
 - 📋 **Batch Recording** - Record multiple URLs in sequence
 - ⏰ **Scheduled Recordings** - Set up automated captures
 
@@ -31,9 +32,9 @@ Support the project to unlock premium features:
 
 Download the latest release for your platform:
 
-- **Windows**: [Blazeycc.exe](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc.exe) | [Portable](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc-Portable.exe)
-- **macOS**: [Blazeycc.dmg](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc.dmg) | [ZIP](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc.zip)
-- **Linux**: [AppImage](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc.AppImage) | [.deb](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc.deb) | [.rpm](https://github.com/theKennethy/Blazeycc/releases/download/latest/Blazeycc.rpm)
+- **Windows**: [Blazeycc.exe](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-Setup.exe) | [Portable](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-Portable.exe)
+- **macOS**: [Blazeycc.dmg](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.dmg) | [ARM64](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc-arm64.dmg)
+- **Linux**: [AppImage](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.AppImage) | [.deb](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.deb) | [.rpm](https://github.com/blazeycc/Blazeycc/releases/latest/download/Blazeycc.rpm)
 
 > **Note:** Linux users may need to run with `--no-sandbox` flag. macOS users: right-click → Open on first launch.
 
