@@ -1381,9 +1381,9 @@ async function logAnalytics(db, eventType, email, licenseKey, request, metadata 
 
 // Storage limits per tier in bytes
 const STORAGE_LIMITS = {
-    'pro': 0,                          // No cloud storage for Pro
-    'pro+': 2 * 1024 * 1024 * 1024,     // 2GB for Pro+
-    'pro_plus': 2 * 1024 * 1024 * 1024, // 2GB for Pro+
+    'pro': 2 * 1024 * 1024 * 1024,      // 2GB for Pro
+    'pro+': 5 * 1024 * 1024 * 1024,     // 5GB for Pro+
+    'pro_plus': 5 * 1024 * 1024 * 1024, // 5GB for Pro+
     'pro_max': 15 * 1024 * 1024 * 1024, // 15GB for Pro Max
     'pro-max': 15 * 1024 * 1024 * 1024  // 15GB for Pro Max
 };

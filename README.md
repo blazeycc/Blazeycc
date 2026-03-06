@@ -53,26 +53,32 @@
 
 ## ✨ Features
 
-| Feature | Free | Pro ($5/mo) | Pro+ ($7/mo) |
-|---------|:----:|:-----------:|:------------:|
-| Record any URL as video | ✅ | ✅ | ✅ |
-| Export to MP4, WebM, GIF | ✅ | ✅ | ✅ |
-| 23 social media presets | ✅ | ✅ | ✅ |
-| Screenshot capture | ✅ | ✅ | ✅ |
-| Bookmarks & history | ✅ | ✅ | ✅ |
-| Auto-scroll recording | ✅ | ✅ | ✅ |
-| Audio capture | ✅ | ✅ | ✅ |
-| Dark & light themes | ✅ | ✅ | ✅ |
-| Auto-updates | ✅ | ✅ | ✅ |
-| **Remove watermark** | ❌ | ✅ | ✅ |
-| **4K export (3840×2160)** | ❌ | ✅ | ✅ |
-| **Cloud history sync** | ❌ | ✅ | ✅ |
-| **Custom watermarks** | ❌ | ✅ | ✅ |
-| **Batch recording** | ❌ | ✅ | ✅ |
-| **Scheduled recordings** | ❌ | ✅ | ✅ |
-| **5GB cloud storage** | ❌ | ❌ | ✅ |
-| **Shareable video links** | ❌ | ❌ | ✅ |
-| **Cloud preview/streaming** | ❌ | ❌ | ✅ |
+| Feature | Free | Pro ($5/mo) | Pro+ ($7/mo) | Pro Max ($12/mo) |
+|---------|:----:|:-----------:|:------------:|:----------------:|
+| Record any URL as video | ✅ | ✅ | ✅ | ✅ |
+| Export to MP4, WebM, GIF | ✅ | ✅ | ✅ | ✅ |
+| 23 social media presets | ✅ | ✅ | ✅ | ✅ |
+| Screenshot capture | ✅ | ✅ | ✅ | ✅ |
+| Bookmarks & history | ✅ | ✅ | ✅ | ✅ |
+| Auto-scroll recording | ✅ | ✅ | ✅ | ✅ |
+| Audio capture | ✅ | ✅ | ✅ | ✅ |
+| Dark & light themes | ✅ | ✅ | ✅ | ✅ |
+| Auto-updates | ✅ | ✅ | ✅ | ✅ |
+| **Remove watermark** | ❌ | ✅ | ✅ | ✅ |
+| **4K export (3840×2160)** | ❌ | ✅ | ✅ | ✅ |
+| **Custom watermarks** | ❌ | ✅ | ✅ | ✅ |
+| **Batch recording** | ❌ | ✅ | ✅ | ✅ |
+| **Scheduled recordings** | ❌ | ✅ | ✅ | ✅ |
+| **2GB cloud storage** | ❌ | ✅ | ✅ | ✅ |
+| **Shareable video links** | ❌ | ✅ | ✅ | ✅ |
+| **Cloud preview/streaming** | ❌ | ✅ | ✅ | ✅ |
+| **5GB cloud storage** | ❌ | ❌ | ✅ | ✅ |
+| **Export to YouTube/Vimeo** | ❌ | ❌ | ✅ | ✅ |
+| **15GB cloud storage** | ❌ | ❌ | ❌ | ✅ |
+| **3 device seats** | ❌ | ❌ | ❌ | ✅ |
+| **Recording analytics** | ❌ | ❌ | ❌ | ✅ |
+| **Embed codes** | ❌ | ❌ | ❌ | ✅ |
+| **Priority support** | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -107,14 +113,19 @@ Unlock Pro features and support ongoing development:
 
 <table>
 <tr>
-<td align="center" width="50%">
-<h3>☕ Pro — $5/mo</h3>
-<p>Remove watermarks, 4K export, cloud sync, batch recording, custom watermarks, scheduled recordings</p>
+<td align="center" width="33%">
+<h3>🎬 Pro — $5/mo</h3>
+<p>No watermark, 4K export, 2GB cloud storage, shareable links, batch recording</p>
 <a href="https://blazeycc.com/pricing.html">Subscribe →</a>
 </td>
-<td align="center" width="50%">
-<h3>☁️ Pro+ — $7/mo</h3>
-<p>Everything in Pro, plus 5GB cloud storage, shareable links, cloud preview, export to YouTube/Vimeo</p>
+<td align="center" width="33%">
+<h3>📦 Pro+ — $7/mo</h3>
+<p>Everything in Pro, plus 5GB cloud storage, export to YouTube/Vimeo</p>
+<a href="https://blazeycc.com/pricing.html">Subscribe →</a>
+</td>
+<td align="center" width="33%">
+<h3>⚡ Pro Max — $12/mo</h3>
+<p>Everything in Pro+, plus 15GB storage, 3 devices, analytics, priority support</p>
 <a href="https://blazeycc.com/pricing.html">Subscribe →</a>
 </td>
 </tr>

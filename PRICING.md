@@ -29,10 +29,11 @@ Thank you for considering subscribing to Blazeycc Pro! Your support helps keep t
 | **Custom watermarks** | ❌ | ✅ | ✅ | ✅ |
 | **Batch recording** | ❌ | ✅ | ✅ | ✅ |
 | **Scheduled recordings** | ❌ | ✅ | ✅ | ✅ |
-| **2GB cloud storage** | ❌ | ❌ | ✅ | ✅ |
-| **Shareable links** | ❌ | ❌ | ✅ | ✅ |
-| **Cloud preview** | ❌ | ❌ | ✅ | ✅ |
+| **2GB cloud storage** | ❌ | ✅ | ✅ | ✅ |
+| **Shareable links** | ❌ | ✅ | ✅ | ✅ |
+| **Cloud preview** | ❌ | ✅ | ✅ | ✅ |
 | **Export to YouTube/Vimeo** | ❌ | ❌ | ✅ | ✅ |
+| **5GB cloud storage** | ❌ | ❌ | ✅ | ✅ |
 | **15GB cloud storage** | ❌ | ❌ | ❌ | ✅ |
 | **2 team seats included** | ❌ | ❌ | ❌ | ✅ |
 | **Password-protected links** | ❌ | ❌ | ❌ | ✅ |
@@ -56,18 +57,19 @@ Unlock professional features to supercharge your workflow:
 - ✅ **Custom watermarks** - add your own branding
 - ✅ **Batch recording** - record multiple URLs automatically
 - ✅ **Scheduled recordings** - set recordings to start at specific times
+- ✅ **2GB Cloud Storage** - save recordings directly to the cloud
+- ✅ **Shareable links** - generate public links to share your recordings
+- ✅ **Cloud preview** - stream videos without downloading
 - ✅ Priority feature requests
 
 ### ☁️ $7/month - Pro+ License
 
 **Or $70/year (save $14 - 2 months free!)**
 
-Everything in Pro, plus cloud storage for your recordings:
+Everything in Pro, plus more storage and export options:
 
 - ✅ **Everything in Pro**
-- ✅ **2GB Cloud Storage** - save recordings directly to the cloud
-- ✅ **Shareable links** - generate public links to share your recordings
-- ✅ **Cloud preview** - stream videos without downloading
+- ✅ **5GB Cloud Storage** - more room for your recordings
 - ✅ **Export to YouTube/Vimeo** - one-click export workflow
 - ✅ Access your videos from any device
 
