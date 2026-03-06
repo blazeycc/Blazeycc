@@ -1264,12 +1264,35 @@ async function handleStripeCheckout(request, env, corsHeaders) {
         return jsonResponse({ error: 'Email required' }, 400, corsHeaders);
     }
     
+    // Check if this is a lifetime purchase
+    const isLifetime = tier?.startsWith('lifetime_');
+    
     // Price IDs - set these in your Cloudflare Worker environment variables
-    const priceId = tier === 'pro+' ? env.STRIPE_PRICE_PRO_PLUS : env.STRIPE_PRICE_PRO;
+    // STRIPE_PRICE_PRO, STRIPE_PRICE_PRO_PLUS, STRIPE_PRICE_PRO_MAX (subscriptions)
+    // STRIPE_PRICE_LIFETIME_PRO, STRIPE_PRICE_LIFETIME_PRO_PLUS, STRIPE_PRICE_LIFETIME_PRO_MAX (one-time)
+    const priceMap = {
+        'pro': env.STRIPE_PRICE_PRO,
+        'pro_plus': env.STRIPE_PRICE_PRO_PLUS,
+        'pro+': env.STRIPE_PRICE_PRO_PLUS,
+        'pro_max': env.STRIPE_PRICE_PRO_MAX,
+        'lifetime_pro': env.STRIPE_PRICE_LIFETIME_PRO,
+        'lifetime_pro_plus': env.STRIPE_PRICE_LIFETIME_PRO_PLUS,
+        'lifetime_pro_max': env.STRIPE_PRICE_LIFETIME_PRO_MAX,
+    };
+    
+    const priceId = priceMap[tier];
     
     if (!priceId) {
         return jsonResponse({ error: 'Price not configured for tier: ' + tier }, 503, corsHeaders);
     }
+    
+    // Map lifetime tiers to their base tier for storage
+    const baseTierMap = {
+        'lifetime_pro': 'pro',
+        'lifetime_pro_plus': 'pro_plus',
+        'lifetime_pro_max': 'pro_max',
+    };
+    const storedTier = baseTierMap[tier] || tier;
     
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
         method: 'POST',
@@ -1278,13 +1301,14 @@ async function handleStripeCheckout(request, env, corsHeaders) {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-            'mode': 'subscription',
+            'mode': isLifetime ? 'payment' : 'subscription',
             'customer_email': email.toLowerCase().trim(),
             'line_items[0][price]': priceId,
             'line_items[0][quantity]': '1',
             'success_url': successUrl || 'https://blazeycc.com/success',
             'cancel_url': cancelUrl || 'https://blazeycc.com/pricing',
-            'metadata[tier]': tier || 'pro',
+            'metadata[tier]': storedTier,
+            'metadata[is_lifetime]': isLifetime ? 'true' : 'false',
             'metadata[email]': email.toLowerCase().trim(),
         }),
     });
