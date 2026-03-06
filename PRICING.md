@@ -33,9 +33,12 @@ Thank you for considering subscribing to Blazeycc Pro! Your support helps keep t
 | **Shareable links** | ❌ | ✅ | ✅ | ✅ |
 | **Cloud preview** | ❌ | ✅ | ✅ | ✅ |
 | **Export to YouTube/Vimeo** | ❌ | ❌ | ✅ | ✅ |
+| **Custom thumbnails** | ❌ | ❌ | ✅ | ✅ |
+| **Download links for viewers** | ❌ | ❌ | ✅ | ✅ |
+| **Recording annotations** | ❌ | ❌ | ✅ | ✅ |
 | **5GB cloud storage** | ❌ | ❌ | ✅ | ✅ |
 | **15GB cloud storage** | ❌ | ❌ | ❌ | ✅ |
-| **2 team seats included** | ❌ | ❌ | ❌ | ✅ |
+| **3 team seats included** | ❌ | ❌ | ❌ | ✅ |
 | **Password-protected links** | ❌ | ❌ | ❌ | ✅ |
 | **Recording analytics** | ❌ | ❌ | ❌ | ✅ |
 | **Embed codes** | ❌ | ❌ | ❌ | ✅ |
@@ -71,6 +74,9 @@ Everything in Pro, plus more storage and export options:
 - ✅ **Everything in Pro**
 - ✅ **5GB Cloud Storage** - more room for your recordings
 - ✅ **Export to YouTube/Vimeo** - one-click export workflow
+- ✅ **Custom thumbnails** - control how your video previews look
+- ✅ **Download links for viewers** - let others download your recordings
+- ✅ **Recording annotations** - add arrows, highlights, and text overlays
 - ✅ Access your videos from any device
 
 ### 🚀 $12/month - Pro Max License
@@ -81,7 +87,7 @@ Everything in Pro+, with expanded storage and team features:
 
 - ✅ **Everything in Pro+**
 - ✅ **15GB Cloud Storage** - plenty of room for all your recordings
-- ✅ **2 team seats included** - invite collaborators to your workspace
+- ✅ **3 team seats included** - invite collaborators to your workspace
 - ✅ **Password-protected links** - secure your shared recordings
 - ✅ **Recording analytics** - views, watch time, and viewer insights
 - ✅ **Embed codes** - embed recordings directly on any website

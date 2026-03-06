@@ -462,7 +462,7 @@ async function startRecording() {
         
         // Start audio capture if enabled
         if (state.audioEnabled) {
-            startAudioCapture();
+            await startAudioCapture();
         }
         
         // Start auto-scroll if enabled
@@ -2020,59 +2020,80 @@ document.addEventListener('DOMContentLoaded', () => {
 // AUDIO CAPTURE FUNCTIONS
 // =====================
 
-// Start capturing audio from the webview
+// Audio capture state
+let audioStream = null;
+let audioRecorder = null;
+let audioChunks = [];
+
+// Start capturing system/tab audio using desktopCapturer
 async function startAudioCapture() {
     try {
-        // Use execJS to inject audio capture into webview
-        const webview = elements.webview;
-        if (!webview) return;
-        
-        // Inject audio capture script into webview
-        const captureScript = `
-            (async function() {
-                try {
-                    // Get audio stream from the page
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const dest = audioCtx.createMediaStreamDestination();
-                    
-                    // Try to capture all audio elements on the page
-                    const audioElements = document.querySelectorAll('audio, video');
-                    audioElements.forEach(el => {
-                        try {
-                            const source = audioCtx.createMediaElementSource(el);
-                            source.connect(dest);
-                            source.connect(audioCtx.destination); // Keep playing
-                        } catch(e) {
-                            // Element may already be connected or not playable
-                        }
-                    });
-                    
-                    // Start recording the combined audio stream
-                    const mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
-                    window.__blazeyccAudioRecorder = mediaRecorder;
-                    window.__blazeyccAudioChunks = [];
-                    
-                    mediaRecorder.ondataavailable = (e) => {
-                        if (e.data.size > 0) {
-                            window.__blazeyccAudioChunks.push(e.data);
-                        }
-                    };
-                    
-                    mediaRecorder.start(1000); // Record in 1-second chunks
-                    return { success: true };
-                } catch(e) {
-                    return { success: false, error: e.message };
-                }
-            })()
-        `;
-        
-        const result = await webview.executeJavaScript(captureScript);
-        if (result.success) {
-            console.log('Audio capture started in webview');
-            state.audioMediaRecorder = true; // Marker that audio is recording
-        } else {
-            console.log('Audio capture not available:', result.error);
+        // Get the main window source from desktopCapturer
+        const sourceResult = await window.electronAPI.getWebviewSource();
+        if (!sourceResult.success) {
+            console.log('Could not get window source for audio capture');
+            return;
         }
+        
+        // Request audio stream using desktopCapturer
+        // This captures system audio on macOS/Windows, requires PulseAudio loopback on Linux
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sourceResult.sourceId
+                    }
+                },
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sourceResult.sourceId,
+                        maxWidth: 1,
+                        maxHeight: 1
+                    }
+                }
+            });
+            
+            // We only need the audio track, stop video
+            audioStream.getVideoTracks().forEach(track => track.stop());
+            
+            // Create audio-only stream
+            const audioTracks = audioStream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                console.log('No audio track available in system capture');
+                showNotification('Audio capture not available on this system', 'warning');
+                return;
+            }
+            
+            const audioOnlyStream = new MediaStream(audioTracks);
+            
+            // Start recording
+            audioChunks = [];
+            audioRecorder = new MediaRecorder(audioOnlyStream, { 
+                mimeType: 'audio/webm;codecs=opus' 
+            });
+            
+            audioRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
+            };
+            
+            audioRecorder.start(1000); // Collect in 1-second chunks
+            state.audioMediaRecorder = true;
+            console.log('System audio capture started');
+            
+        } catch (streamError) {
+            console.log('System audio not available:', streamError.message);
+            // On Linux, this is expected without PulseAudio loopback configuration
+            if (navigator.platform.includes('Linux')) {
+                showNotification('Audio requires PulseAudio loopback setup on Linux', 'warning');
+            } else {
+                showNotification('System audio capture failed', 'warning');
+            }
+        }
+        
     } catch (error) {
         console.error('Failed to start audio capture:', error);
     }
@@ -2081,51 +2102,60 @@ async function startAudioCapture() {
 // Stop audio capture and return the audio file path
 async function stopAudioCapture() {
     try {
-        const webview = elements.webview;
-        if (!webview || !state.audioMediaRecorder) return null;
-        
-        // Stop recording and get audio data from webview
-        const stopScript = `
-            (async function() {
-                try {
-                    const recorder = window.__blazeyccAudioRecorder;
-                    if (!recorder) return { success: false, error: 'No recorder' };
-                    
-                    return new Promise((resolve) => {
-                        recorder.onstop = async () => {
-                            const blob = new Blob(window.__blazeyccAudioChunks, { type: 'audio/webm' });
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                                const base64 = reader.result.split(',')[1];
-                                resolve({ success: true, data: base64 });
-                            };
-                            reader.readAsDataURL(blob);
-                        };
-                        recorder.stop();
-                    });
-                } catch(e) {
-                    return { success: false, error: e.message };
-                }
-            })()
-        `;
-        
-        const result = await webview.executeJavaScript(stopScript);
-        state.audioMediaRecorder = null;
-        
-        if (result.success && result.data) {
-            // Save the audio to a temp file via main process
-            const startResult = await window.electronAPI.startAudioCapture();
-            if (startResult.success) {
-                await window.electronAPI.saveAudioChunk(result.data);
-                const stopResult = await window.electronAPI.stopAudioCapture();
-                if (stopResult.success) {
-                    console.log('Audio saved to:', stopResult.audioPath);
-                    return stopResult.audioPath;
-                }
-            }
+        if (!audioRecorder || !state.audioMediaRecorder) {
+            return null;
         }
         
-        return null;
+        return new Promise(async (resolve) => {
+            audioRecorder.onstop = async () => {
+                try {
+                    // Combine chunks into a blob
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    
+                    if (audioBlob.size === 0) {
+                        console.log('No audio data captured');
+                        resolve(null);
+                        return;
+                    }
+                    
+                    // Convert to base64
+                    const reader = new FileReader();
+                    reader.onloadend = async () => {
+                        const base64 = reader.result.split(',')[1];
+                        
+                        // Save via main process
+                        const startResult = await window.electronAPI.startAudioCapture();
+                        if (startResult.success) {
+                            await window.electronAPI.saveAudioChunk(base64);
+                            const stopResult = await window.electronAPI.stopAudioCapture();
+                            if (stopResult.success) {
+                                console.log('Audio saved to:', stopResult.audioPath);
+                                resolve(stopResult.audioPath);
+                                return;
+                            }
+                        }
+                        resolve(null);
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    
+                } catch (e) {
+                    console.error('Failed to process audio:', e);
+                    resolve(null);
+                }
+            };
+            
+            // Stop recording
+            audioRecorder.stop();
+            state.audioMediaRecorder = null;
+            
+            // Stop and release audio stream
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            audioRecorder = null;
+        });
+        
     } catch (error) {
         console.error('Failed to stop audio capture:', error);
         return null;

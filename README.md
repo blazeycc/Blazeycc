@@ -120,7 +120,7 @@ Unlock Pro features and support ongoing development:
 </td>
 <td align="center" width="33%">
 <h3>📦 Pro+ — $7/mo</h3>
-<p>Everything in Pro, plus 5GB cloud storage, export to YouTube/Vimeo</p>
+<p>Everything in Pro, plus 5GB storage, YouTube/Vimeo export, thumbnails, annotations</p>
 <a href="https://blazeycc.com/pricing.html">Subscribe →</a>
 </td>
 <td align="center" width="33%">
