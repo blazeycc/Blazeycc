@@ -1,6 +1,6 @@
 # 💜 Support Blazeycc Development
 
-Thank you for considering sponsoring Blazeycc! Your support helps keep this project active and enables new features.
+Thank you for considering subscribing to Blazeycc Pro! Your support helps keep this project active and enables new features.
 
 ---
 
@@ -36,7 +36,7 @@ Thank you for considering sponsoring Blazeycc! Your support helps keep this proj
 
 ---
 
-## 🎁 Sponsor Tiers
+## 🎁 Subscription Tiers
 
 ### ☕ $5/month - Pro License
 
@@ -74,11 +74,11 @@ Your license is tied to your subscription email. As long as you have an active s
 
 ---
 
-## 💡 Why Sponsor?
+## 💡 Why Subscribe?
 
 - **Direct impact**: Your support funds active development
-- **New features**: Sponsors get early access to new features
-- **Priority support**: Issues from sponsors are prioritized
+- **New features**: Subscribers get early access to new features
+- **Priority support**: Issues from subscribers are prioritized
 - **Feature requests**: Have a say in the roadmap
 
 **Thank you for supporting Blazeycc! 💜**
