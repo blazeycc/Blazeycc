@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get Your Pro/Pro+ License - Blazeycc</title>
-    <meta name="description" content="Get your Blazeycc Pro or Pro+ license key">
+    <title>Get Your License - Blazeycc</title>
+    <meta name="description" content="Get your Blazeycc Pro, Pro+, or Pro Max license key">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -162,6 +162,9 @@
             text-align: center;
         }
         .tier-badge.pro-plus {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        .tier-badge.pro-max {
             background: linear-gradient(135deg, #f59e0b, #ef4444);
         }
         .tier-features {
@@ -249,11 +252,11 @@
         <div class="card">
             <div class="logo">
                 <div class="logo-icon">◉</div>
-                <div class="logo-text">Blazeycc Pro/Pro+</div>
+                <div class="logo-text">Blazeycc License</div>
             </div>
             
             <h1>Get Your License Key</h1>
-            <p class="subtitle">Enter the email you used for your subscription ($5/mo Pro or $7/mo Pro+)</p>
+            <p class="subtitle">Enter the email you used for your subscription</p>
             
             <form id="licenseForm">
                 <div class="form-group">
@@ -287,11 +290,11 @@
             </div>
             
             <div class="note">
-                <strong>Not subscribed yet?</strong> Subscribe to unlock Pro ($5/mo) or Pro+ ($7/mo) features!
+                <strong>Not subscribed yet?</strong> Choose from Pro ($5/mo), Pro+ ($7/mo), or Pro Max ($12/mo)!
             </div>
             
             <a href="pricing.html" class="sponsor-link">
-                💳 Subscribe Now ($5/mo Pro or $7/mo Pro+)
+                💳 View Plans & Subscribe
             </a>
             
             <a href="/" class="back-link">← Back to Blazeycc</a>
@@ -354,19 +357,43 @@
         
         const proPlusFeatures = [
             ...proFeatures,
-            '✅ 5GB Cloud Storage',
+            '✅ 2GB Cloud Storage',
             '✅ Shareable video links',
             '✅ Cloud preview/streaming',
             '✅ Export to YouTube/Vimeo'
         ];
         
+        const proMaxFeatures = [
+            ...proPlusFeatures,
+            '✅ 15GB Cloud Storage',
+            '✅ 2 team seats included',
+            '✅ Password-protected links',
+            '✅ Recording analytics',
+            '✅ Embed codes',
+            '✅ Priority support'
+        ];
+        
         function showFeatures(tier) {
             const badge = document.getElementById('tierBadge');
             const list = document.getElementById('featuresList');
-            const features = tier === 'pro+' ? proPlusFeatures : proFeatures;
             
-            badge.textContent = tier === 'pro+' ? 'Pro+' : 'Pro';
-            badge.className = 'tier-badge' + (tier === 'pro+' ? ' pro-plus' : '');
+            let features, badgeText, badgeClass;
+            if (tier === 'pro_max' || tier === 'pro-max') {
+                features = proMaxFeatures;
+                badgeText = 'Pro Max';
+                badgeClass = 'tier-badge pro-max';
+            } else if (tier === 'pro+' || tier === 'pro_plus') {
+                features = proPlusFeatures;
+                badgeText = 'Pro+';
+                badgeClass = 'tier-badge pro-plus';
+            } else {
+                features = proFeatures;
+                badgeText = 'Pro';
+                badgeClass = 'tier-badge';
+            }
+            
+            badge.textContent = badgeText;
+            badge.className = badgeClass;
             
             list.innerHTML = features.map(f => `<li>${f}</li>`).join('');
         }
