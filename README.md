@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/blazeycc/Blazeycc/main/build/icon-light.png">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/blazeycc/Blazeycc/main/build/icon.png">
-    <img src="build/icon.png" alt="Blazeycc Logo" width="128" height="128">
+    <img src="build/icon.png" alt="Blazeycc Logo" width="512" height="512">
   </picture>
 </p>
 
