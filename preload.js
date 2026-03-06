@@ -96,5 +96,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     removeFFmpegProgressListener: () => {
         ipcRenderer.removeAllListeners('ffmpeg-progress');
-    }
+    },
+    
+    // Auto-update
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    onUpdateAvailable: (callback) => {
+        ipcRenderer.on('update-available', (event, data) => callback(data));
+    },
+    onUpdateNotAvailable: (callback) => {
+        ipcRenderer.on('update-not-available', () => callback());
+    },
+    onUpdateDownloadProgress: (callback) => {
+        ipcRenderer.on('update-download-progress', (event, data) => callback(data));
+    },
+    onUpdateDownloaded: (callback) => {
+        ipcRenderer.on('update-downloaded', (event, data) => callback(data));
+    },
+    onUpdateError: (callback) => {
+        ipcRenderer.on('update-error', (event, data) => callback(data));
+    },
+    
+    // Audio recording toggle (for webview audio capture)
+    setAudioEnabled: (enabled) => ipcRenderer.invoke('set-audio-enabled', enabled),
+    getAudioEnabled: () => ipcRenderer.invoke('get-audio-enabled'),
+    startAudioCapture: () => ipcRenderer.invoke('start-audio-capture'),
+    saveAudioChunk: (chunkData) => ipcRenderer.invoke('save-audio-chunk', chunkData),
+    stopAudioCapture: () => ipcRenderer.invoke('stop-audio-capture'),
+    cancelAudioCapture: () => ipcRenderer.invoke('cancel-audio-capture')
 });

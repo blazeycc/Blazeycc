@@ -56,6 +56,7 @@ const elements = {
     // New elements
     themeToggleBtn: document.getElementById('themeToggleBtn'),
     autoScrollToggle: document.getElementById('autoScrollToggle'),
+    audioToggle: document.getElementById('audioToggle'),
     // Quick export buttons
     quickExportBtns: document.querySelectorAll('.quick-export-btn'),
     // Preview modal
@@ -132,6 +133,10 @@ const state = {
     // Canvas-based recording
     canvasRecordingActive: false,
     frameCaptureInterval: null,
+    // Audio capture state
+    audioEnabled: false,
+    audioMediaRecorder: null,
+    audioChunks: [],
     // Pro features
     customWatermarkSettings: { type: 'none', text: '', position: 'bottom-left', imagePath: null }
 };
@@ -178,6 +183,21 @@ async function init() {
     if (scrollSpeedInput && scrollSpeedValue) {
         scrollSpeedInput.addEventListener('input', (e) => {
             scrollSpeedValue.textContent = e.target.value;
+        });
+    }
+    
+    // Audio toggle
+    if (elements.audioToggle) {
+        // Load saved audio preference
+        window.electronAPI.getAudioEnabled().then(enabled => {
+            state.audioEnabled = enabled;
+            elements.audioToggle.checked = enabled;
+        });
+        
+        elements.audioToggle.addEventListener('change', async (e) => {
+            state.audioEnabled = e.target.checked;
+            await window.electronAPI.setAudioEnabled(e.target.checked);
+            showNotification(e.target.checked ? 'Audio capture enabled' : 'Audio capture disabled', 'info');
         });
     }
     
@@ -439,12 +459,17 @@ async function startRecording() {
                 });
         }, 66); // ~15fps for smoother UI
         
+        // Start audio capture if enabled
+        if (state.audioEnabled) {
+            startAudioCapture();
+        }
+        
         // Start auto-scroll if enabled
         if (state.autoScrollEnabled) {
             startAutoScroll();
         }
 
-        showNotification('Recording started! Interact with the website.', 'success');
+        showNotification('Recording started!' + (state.audioEnabled ? ' (with audio)' : ''), 'success');
     } catch (error) {
         console.error('Recording error:', error);
         showNotification('Failed to start recording: ' + error.message, 'error');
@@ -455,6 +480,12 @@ async function startRecording() {
 async function stopRecording() {
     // Stop auto-scroll
     stopAutoScroll();
+    
+    // Stop audio capture if active
+    let audioPath = null;
+    if (state.audioEnabled && state.audioMediaRecorder) {
+        audioPath = await stopAudioCapture();
+    }
     
     // Log dropped frames if any
     if (state.droppedFrames > 0) {
@@ -482,9 +513,12 @@ async function stopRecording() {
         elements.statusText.textContent = 'Processing...';
         elements.recordingTimer.textContent = '';
         
-        // Process the recording with FFmpeg
+        // Process the recording with FFmpeg (pass audio path if available)
         try {
             const settings = getExportSettings();
+            settings.proSettings = settings.proSettings || {};
+            settings.proSettings.audioPath = audioPath;
+            
             const result = await window.electronAPI.stopCanvasRecording(
                 settings.format,
                 settings.quality,
@@ -1952,3 +1986,119 @@ document.addEventListener('DOMContentLoaded', () => {
     initFastEncoding();
     initCloudSync();
 });
+
+// =====================
+// AUDIO CAPTURE FUNCTIONS
+// =====================
+
+// Start capturing audio from the webview
+async function startAudioCapture() {
+    try {
+        // Use execJS to inject audio capture into webview
+        const webview = elements.webview;
+        if (!webview) return;
+        
+        // Inject audio capture script into webview
+        const captureScript = `
+            (async function() {
+                try {
+                    // Get audio stream from the page
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const dest = audioCtx.createMediaStreamDestination();
+                    
+                    // Try to capture all audio elements on the page
+                    const audioElements = document.querySelectorAll('audio, video');
+                    audioElements.forEach(el => {
+                        try {
+                            const source = audioCtx.createMediaElementSource(el);
+                            source.connect(dest);
+                            source.connect(audioCtx.destination); // Keep playing
+                        } catch(e) {
+                            // Element may already be connected or not playable
+                        }
+                    });
+                    
+                    // Start recording the combined audio stream
+                    const mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
+                    window.__blazeyccAudioRecorder = mediaRecorder;
+                    window.__blazeyccAudioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            window.__blazeyccAudioChunks.push(e.data);
+                        }
+                    };
+                    
+                    mediaRecorder.start(1000); // Record in 1-second chunks
+                    return { success: true };
+                } catch(e) {
+                    return { success: false, error: e.message };
+                }
+            })()
+        `;
+        
+        const result = await webview.executeJavaScript(captureScript);
+        if (result.success) {
+            console.log('Audio capture started in webview');
+            state.audioMediaRecorder = true; // Marker that audio is recording
+        } else {
+            console.log('Audio capture not available:', result.error);
+        }
+    } catch (error) {
+        console.error('Failed to start audio capture:', error);
+    }
+}
+
+// Stop audio capture and return the audio file path
+async function stopAudioCapture() {
+    try {
+        const webview = elements.webview;
+        if (!webview || !state.audioMediaRecorder) return null;
+        
+        // Stop recording and get audio data from webview
+        const stopScript = `
+            (async function() {
+                try {
+                    const recorder = window.__blazeyccAudioRecorder;
+                    if (!recorder) return { success: false, error: 'No recorder' };
+                    
+                    return new Promise((resolve) => {
+                        recorder.onstop = async () => {
+                            const blob = new Blob(window.__blazeyccAudioChunks, { type: 'audio/webm' });
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const base64 = reader.result.split(',')[1];
+                                resolve({ success: true, data: base64 });
+                            };
+                            reader.readAsDataURL(blob);
+                        };
+                        recorder.stop();
+                    });
+                } catch(e) {
+                    return { success: false, error: e.message };
+                }
+            })()
+        `;
+        
+        const result = await webview.executeJavaScript(stopScript);
+        state.audioMediaRecorder = null;
+        
+        if (result.success && result.data) {
+            // Save the audio to a temp file via main process
+            const startResult = await window.electronAPI.startAudioCapture();
+            if (startResult.success) {
+                await window.electronAPI.saveAudioChunk(result.data);
+                const stopResult = await window.electronAPI.stopAudioCapture();
+                if (stopResult.success) {
+                    console.log('Audio saved to:', stopResult.audioPath);
+                    return stopResult.audioPath;
+                }
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Failed to stop audio capture:', error);
+        return null;
+    }
+}

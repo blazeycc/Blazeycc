@@ -19,6 +19,15 @@ export default {
 
         try {
             // =====================
+            // ADMIN DASHBOARD
+            // =====================
+            
+            // Serve admin dashboard UI
+            if (path === '/admin' || path === '/admin/') {
+                return handleAdminDashboard(request, env, corsHeaders);
+            }
+            
+            // =====================
             // PUBLIC ENDPOINTS
             // =====================
             
@@ -708,6 +717,251 @@ async function handleAdminStats(request, env, corsHeaders) {
             usage_7d: usage.count
         }
     }, 200, corsHeaders);
+}
+
+// =====================
+// ADMIN DASHBOARD
+// =====================
+
+async function handleAdminDashboard(request, env, corsHeaders) {
+    // Check admin key from query param or header
+    const url = new URL(request.url);
+    const adminKey = url.searchParams.get('key') || request.headers.get('X-Admin-Key');
+    
+    if (!adminKey || adminKey !== env.ADMIN_KEY) {
+        return new Response('Unauthorized. Add ?key=YOUR_ADMIN_KEY', { 
+            status: 401, 
+            headers: { 'Content-Type': 'text/plain' } 
+        });
+    }
+    
+    // Fetch stats for the dashboard
+    const [stats, recentAnalytics, topUsers, emails, promos] = await Promise.all([
+        env.DB.prepare('SELECT COUNT(*) as total FROM allowed_emails').first(),
+        env.DB.prepare(`
+            SELECT event_type, COUNT(*) as count 
+            FROM analytics 
+            WHERE created_at >= datetime('now', '-7 days')
+            GROUP BY event_type 
+            ORDER BY count DESC 
+            LIMIT 10
+        `).all(),
+        env.DB.prepare(`
+            SELECT email, COUNT(*) as actions, MAX(created_at) as last_active
+            FROM usage_tracking 
+            WHERE created_at >= datetime('now', '-30 days') AND email IS NOT NULL
+            GROUP BY email 
+            ORDER BY actions DESC 
+            LIMIT 15
+        `).all(),
+        env.DB.prepare('SELECT email, tier, note, created_at FROM allowed_emails ORDER BY created_at DESC LIMIT 20').all(),
+        env.DB.prepare('SELECT code, current_uses, max_uses, valid_until FROM promo_codes ORDER BY created_at DESC LIMIT 10').all()
+    ]);
+    
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blazeycc Admin Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f23; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #a855f7; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        h1::before { content: '🔥'; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .card { background: #1a1a2e; border-radius: 12px; padding: 20px; border: 1px solid #333; }
+        .card h2 { color: #a855f7; margin-bottom: 15px; font-size: 1.1rem; }
+        .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: #888; }
+        .stat-value { font-weight: bold; color: #10b981; }
+        .stat-value.purple { color: #a855f7; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #333; }
+        th { color: #a855f7; font-weight: 600; }
+        td { color: #ccc; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+        .badge-pro { background: #a855f7; color: white; }
+        .badge-pro-plus { background: #6366f1; color: white; }
+        .refresh-btn { background: #a855f7; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-bottom: 20px; }
+        .refresh-btn:hover { background: #9333ea; }
+        .timestamp { color: #666; font-size: 0.8rem; }
+        .api-section { margin-top: 30px; }
+        .api-endpoint { background: #252540; padding: 12px; border-radius: 6px; margin: 8px 0; font-family: monospace; font-size: 0.85rem; }
+        .method { color: #10b981; font-weight: bold; }
+        input[type="text"], input[type="email"] { background: #252540; border: 1px solid #444; color: white; padding: 8px 12px; border-radius: 6px; margin-right: 10px; }
+        button { background: #a855f7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #9333ea; }
+        .form-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        #result { margin-top: 10px; padding: 10px; background: #252540; border-radius: 6px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Blazeycc Admin</h1>
+        <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Data</button>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>📊 Overview (Last 7 Days)</h2>
+                <div class="stat-row">
+                    <span class="stat-label">Total Licensed Users</span>
+                    <span class="stat-value purple">${stats?.total || 0}</span>
+                </div>
+                ${recentAnalytics.results?.map(r => `
+                <div class="stat-row">
+                    <span class="stat-label">${r.event_type.replace(/_/g, ' ')}</span>
+                    <span class="stat-value">${r.count}</span>
+                </div>
+                `).join('') || '<div class="stat-row"><span class="stat-label">No events</span></div>'}
+            </div>
+            
+            <div class="card">
+                <h2>👥 Top Active Users (30 Days)</h2>
+                <table>
+                    <tr><th>Email</th><th>Actions</th><th>Last Active</th></tr>
+                    ${topUsers.results?.map(u => `
+                    <tr>
+                        <td>${u.email}</td>
+                        <td>${u.actions}</td>
+                        <td class="timestamp">${new Date(u.last_active).toLocaleDateString()}</td>
+                    </tr>
+                    `).join('') || '<tr><td colspan="3">No data</td></tr>'}
+                </table>
+            </div>
+            
+            <div class="card">
+                <h2>🎫 Recent Licenses</h2>
+                <table>
+                    <tr><th>Email</th><th>Tier</th><th>Added</th></tr>
+                    ${emails.results?.map(e => `
+                    <tr>
+                        <td>${e.email}</td>
+                        <td><span class="badge ${e.tier === 'pro+' ? 'badge-pro-plus' : 'badge-pro'}">${e.tier || 'pro'}</span></td>
+                        <td class="timestamp">${new Date(e.created_at).toLocaleDateString()}</td>
+                    </tr>
+                    `).join('') || '<tr><td colspan="3">No licenses</td></tr>'}
+                </table>
+            </div>
+            
+            <div class="card">
+                <h2>🎁 Promo Codes</h2>
+                <table>
+                    <tr><th>Code</th><th>Uses</th><th>Expires</th></tr>
+                    ${promos.results?.map(p => `
+                    <tr>
+                        <td><code>${p.code}</code></td>
+                        <td>${p.current_uses}${p.max_uses ? '/' + p.max_uses : ''}</td>
+                        <td class="timestamp">${p.valid_until ? new Date(p.valid_until).toLocaleDateString() : 'Never'}</td>
+                    </tr>
+                    `).join('') || '<tr><td colspan="3">No promos</td></tr>'}
+                </table>
+            </div>
+        </div>
+        
+        <div class="card api-section">
+            <h2>⚡ Quick Actions</h2>
+            
+            <h3 style="margin: 15px 0 10px; color: #888;">Add License</h3>
+            <div class="form-row">
+                <input type="email" id="addEmail" placeholder="user@email.com">
+                <select id="addTier" style="background: #252540; border: 1px solid #444; color: white; padding: 8px; border-radius: 6px;">
+                    <option value="pro">Pro ($5)</option>
+                    <option value="pro+">Pro+ ($7)</option>
+                </select>
+                <input type="text" id="addNote" placeholder="Note (optional)">
+                <button onclick="addEmail()">Add Email</button>
+            </div>
+            
+            <h3 style="margin: 15px 0 10px; color: #888;">Create Promo Code</h3>
+            <div class="form-row">
+                <input type="text" id="promoCode" placeholder="CODE123">
+                <input type="number" id="promoMaxUses" placeholder="Max uses" style="width: 100px; background: #252540; border: 1px solid #444; color: white; padding: 8px; border-radius: 6px;">
+                <button onclick="createPromo()">Create Promo</button>
+            </div>
+            
+            <h3 style="margin: 15px 0 10px; color: #888;">Revoke License</h3>
+            <div class="form-row">
+                <input type="email" id="revokeEmail" placeholder="user@email.com">
+                <input type="text" id="revokeReason" placeholder="Reason">
+                <button onclick="revokeLicense()" style="background: #ef4444;">Revoke</button>
+            </div>
+            
+            <div id="result"></div>
+        </div>
+        
+        <div class="card api-section">
+            <h2>🔌 API Endpoints</h2>
+            <div class="api-endpoint"><span class="method">POST</span> /admin/emails/add - Add email to allowed list</div>
+            <div class="api-endpoint"><span class="method">POST</span> /admin/emails/remove - Remove email</div>
+            <div class="api-endpoint"><span class="method">GET</span> /admin/emails/list - List all emails</div>
+            <div class="api-endpoint"><span class="method">POST</span> /admin/revoke - Revoke license</div>
+            <div class="api-endpoint"><span class="method">POST</span> /admin/promo/create - Create promo code</div>
+            <div class="api-endpoint"><span class="method">GET</span> /admin/analytics?days=7 - Get analytics</div>
+            <div class="api-endpoint"><span class="method">GET</span> /admin/stats - Get overview stats</div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = window.location.origin;
+        const ADMIN_KEY = '${adminKey}';
+        
+        function showResult(message, isError = false) {
+            const el = document.getElementById('result');
+            el.style.display = 'block';
+            el.className = isError ? 'error' : 'success';
+            el.textContent = message;
+        }
+        
+        async function apiCall(endpoint, body) {
+            const res = await fetch(API_BASE + endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+                body: JSON.stringify(body)
+            });
+            return res.json();
+        }
+        
+        async function addEmail() {
+            const email = document.getElementById('addEmail').value;
+            const tier = document.getElementById('addTier').value;
+            const note = document.getElementById('addNote').value;
+            if (!email) return showResult('Email required', true);
+            
+            const result = await apiCall('/admin/emails/add', { email, tier, note });
+            showResult(result.success ? 'Added: ' + email + ' (' + tier + ')' : result.error, !result.success);
+            if (result.success) setTimeout(() => location.reload(), 1000);
+        }
+        
+        async function createPromo() {
+            const code = document.getElementById('promoCode').value;
+            const max_uses = document.getElementById('promoMaxUses').value || null;
+            if (!code) return showResult('Code required', true);
+            
+            const result = await apiCall('/admin/promo/create', { code, max_uses: max_uses ? parseInt(max_uses) : null });
+            showResult(result.success ? 'Created: ' + code : result.error, !result.success);
+            if (result.success) setTimeout(() => location.reload(), 1000);
+        }
+        
+        async function revokeLicense() {
+            const email = document.getElementById('revokeEmail').value;
+            const reason = document.getElementById('revokeReason').value;
+            if (!email) return showResult('Email required', true);
+            
+            const result = await apiCall('/admin/revoke', { email, reason });
+            showResult(result.success ? 'Revoked: ' + email : result.error, !result.success);
+        }
+    </script>
+</body>
+</html>`;
+
+    return new Response(html, {
+        headers: { 'Content-Type': 'text/html' }
+    });
 }
 
 // =====================

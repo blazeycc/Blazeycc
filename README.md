@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="build/icon.png" alt="Blazeycc Logo" width="128" height="128">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/blazeycc/Blazeycc/main/build/icon-light.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/blazeycc/Blazeycc/main/build/icon.png">
+    <img src="build/icon.png" alt="Blazeycc Logo" width="128" height="128">
+  </picture>
 </p>
 
 <h1 align="center">Blazeycc</h1>
@@ -60,7 +64,9 @@
 | Screenshot capture | ✅ | ✅ | ✅ |
 | Bookmarks & history | ✅ | ✅ | ✅ |
 | Auto-scroll recording | ✅ | ✅ | ✅ |
+| Audio capture | ✅ | ✅ | ✅ |
 | Dark & light themes | ✅ | ✅ | ✅ |
+| Auto-updates | ✅ | ✅ | ✅ |
 | **Remove watermark** | ❌ | ✅ | ✅ |
 | **4K export (3840×2160)** | ❌ | ✅ | ✅ |
 | **Cloud history sync** | ❌ | ✅ | ✅ |

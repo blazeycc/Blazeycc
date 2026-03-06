@@ -5,6 +5,11 @@ const os = require('os');
 const ffmpeg = require('fluent-ffmpeg');
 const Store = require('electron-store').default || require('electron-store');
 const crypto = require('crypto');
+const { autoUpdater } = require('electron-updater');
+
+// Configure auto-updater
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
 
 // License API configuration
 const LICENSE_SECRET = process.env.LICENSE_SECRET || '4f6fab93b5f0bfb47f3431ab19b230994e94cc946d479e27cf82b1b85c7aaee3';
@@ -1064,12 +1069,184 @@ ipcMain.handle('select-watermark-image', async () => {
     return { success: false };
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+    
+    // Check for updates after window is ready (delay to not block startup)
+    setTimeout(() => {
+        if (app.isPackaged) {
+            autoUpdater.checkForUpdates().catch(err => {
+                console.log('Update check failed:', err.message);
+            });
+        }
+    }, 3000);
+});
+
+// =====================
+// AUTO-UPDATE HANDLERS
+// =====================
+
+autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for updates...');
+});
+
+autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-available', {
+            version: info.version,
+            releaseDate: info.releaseDate,
+            releaseNotes: info.releaseNotes
+        });
+    }
+});
+
+autoUpdater.on('update-not-available', () => {
+    console.log('App is up to date');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-not-available');
+    }
+});
+
+autoUpdater.on('download-progress', (progress) => {
+    console.log(`Download progress: ${Math.round(progress.percent)}%`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-download-progress', {
+            percent: progress.percent,
+            bytesPerSecond: progress.bytesPerSecond,
+            transferred: progress.transferred,
+            total: progress.total
+        });
+    }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info.version);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-downloaded', {
+            version: info.version
+        });
+    }
+});
+
+autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err.message);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-error', { error: err.message });
+    }
+});
+
+// IPC handlers for auto-update
+ipcMain.handle('check-for-updates', async () => {
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return { success: true, updateInfo: result?.updateInfo };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('download-update', async () => {
+    try {
+        await autoUpdater.downloadUpdate();
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall(false, true);
+});
+
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
 
 // Handle uncaught exceptions to prevent crashes
 // Canvas-based recording state
 let canvasRecordingSession = null;
 let pendingFrameWrites = 0;
+
+// Audio capture state
+let audioRecordingSession = null;
+
+// Audio enabled setting
+ipcMain.handle('get-audio-enabled', async () => {
+    return store.get('audioEnabled', false);
+});
+
+ipcMain.handle('set-audio-enabled', async (event, enabled) => {
+    store.set('audioEnabled', enabled);
+    return enabled;
+});
+
+// Start audio capture from webview
+ipcMain.handle('start-audio-capture', async (event, webContentsId) => {
+    try {
+        const tempDir = path.join(os.tmpdir(), `blazeycc-audio-${Date.now()}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+        
+        audioRecordingSession = {
+            tempDir,
+            audioPath: path.join(tempDir, 'audio.webm'),
+            chunks: [],
+            startTime: Date.now()
+        };
+        
+        console.log('Audio recording started, temp dir:', tempDir);
+        return { success: true, audioPath: audioRecordingSession.audioPath };
+    } catch (error) {
+        console.error('Failed to start audio capture:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Save audio chunk
+ipcMain.handle('save-audio-chunk', async (event, chunkData) => {
+    if (!audioRecordingSession) {
+        return { success: false, error: 'No active audio session' };
+    }
+    
+    try {
+        const buffer = Buffer.from(chunkData, 'base64');
+        audioRecordingSession.chunks.push(buffer);
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to save audio chunk:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Stop audio capture and save file
+ipcMain.handle('stop-audio-capture', async () => {
+    if (!audioRecordingSession) {
+        return { success: false, error: 'No active audio session' };
+    }
+    
+    try {
+        // Combine all chunks and write to file
+        const audioBuffer = Buffer.concat(audioRecordingSession.chunks);
+        fs.writeFileSync(audioRecordingSession.audioPath, audioBuffer);
+        
+        console.log('Audio saved to:', audioRecordingSession.audioPath, 'size:', audioBuffer.length);
+        return { success: true, audioPath: audioRecordingSession.audioPath };
+    } catch (error) {
+        console.error('Failed to stop audio capture:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Clear audio session
+ipcMain.handle('cancel-audio-capture', async () => {
+    if (audioRecordingSession?.tempDir) {
+        try {
+            fs.rmSync(audioRecordingSession.tempDir, { recursive: true, force: true });
+        } catch (e) {}
+    }
+    audioRecordingSession = null;
+    return { success: true };
+});
 
 ipcMain.handle('start-canvas-recording', async () => {
     try {
@@ -1196,11 +1373,22 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
         // Build FFmpeg command
         const inputPattern = path.join(tempDir, 'frame_%06d.png');
         
+        // Check for audio file to merge
+        const audioPath = settings.audioPath;
+        const hasAudio = audioPath && fs.existsSync(audioPath);
+        
+        console.log('Audio merge check:', { hasAudio, audioPath });
+        
         return new Promise((resolve, reject) => {
             let command = ffmpeg()
                 .input(inputPattern)
                 .inputFPS(actualFps)
                 .fps(30);
+            
+            // Add audio input if available
+            if (hasAudio) {
+                command = command.input(audioPath);
+            }
             
             // Add watermark input if needed
             if (hasWatermark) {
@@ -1208,16 +1396,19 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
             }
             
             // Build complex filter for resize + watermark
+            // Note: input indices shift when audio is added
+            const watermarkInputIdx = hasAudio ? 2 : 1;
+            
             if (hasWatermark && width && height) {
                 // Both resize and watermark
                 command = command.complexFilter([
                     `[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2[scaled]`,
-                    '[scaled][1:v]overlay=10:H-h-10[out]'
+                    `[scaled][${watermarkInputIdx}:v]overlay=10:H-h-10[out]`
                 ], 'out');
             } else if (hasWatermark) {
                 // Watermark only (bottom-left corner)
                 command = command.complexFilter([
-                    '[0:v][1:v]overlay=10:H-h-10[out]'
+                    `[0:v][${watermarkInputIdx}:v]overlay=10:H-h-10[out]`
                 ], 'out');
             } else if (width && height) {
                 // Resize only
@@ -1228,24 +1419,42 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
             
             // Output format settings
             if (outputFormat === 'mp4') {
+                const outputOpts = [
+                    '-pix_fmt', 'yuv420p',
+                    '-preset', useFastEncode ? 'fast' : 'medium',
+                    '-crf', quality === 'high' ? '18' : quality === 'medium' ? '23' : '28'
+                ];
+                
+                // Add audio codec if we have audio
+                if (hasAudio) {
+                    outputOpts.push('-c:a', 'aac', '-b:a', '128k');
+                    outputOpts.push('-map', '0:v', '-map', '1:a');
+                    outputOpts.push('-shortest'); // End when shortest stream ends
+                }
+                
                 command = command
                     .videoCodec('libx264')
-                    .outputOptions([
-                        '-pix_fmt', 'yuv420p',
-                        '-preset', useFastEncode ? 'fast' : 'medium',
-                        '-crf', quality === 'high' ? '18' : quality === 'medium' ? '23' : '28'
-                    ]);
+                    .outputOptions(outputOpts);
             } else if (outputFormat === 'webm') {
+                const outputOpts = [
+                    '-crf', quality === 'high' ? '20' : quality === 'medium' ? '30' : '40',
+                    '-b:v', '0'
+                ];
+                
+                if (hasAudio) {
+                    outputOpts.push('-c:a', 'libopus', '-b:a', '128k');
+                    outputOpts.push('-map', '0:v', '-map', '1:a');
+                    outputOpts.push('-shortest');
+                }
+                
                 command = command
                     .videoCodec('libvpx-vp9')
-                    .outputOptions([
-                        '-crf', quality === 'high' ? '20' : quality === 'medium' ? '30' : '40',
-                        '-b:v', '0'
-                    ]);
+                    .outputOptions(outputOpts);
             } else if (outputFormat === 'gif') {
                 command = command
                     .fps(15)
                     .outputOptions(['-loop', '0']);
+                // GIF doesn't support audio
             }
             
             command
@@ -1258,17 +1467,25 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
                     }
                 })
                 .on('end', () => {
-                    // Cleanup temp directory
+                    // Cleanup temp directories
                     fs.rmSync(tempDir, { recursive: true, force: true });
+                    if (audioRecordingSession?.tempDir) {
+                        fs.rmSync(audioRecordingSession.tempDir, { recursive: true, force: true });
+                        audioRecordingSession = null;
+                    }
                     canvasRecordingSession = null;
                     
-                    console.log('Canvas recording saved to:', outputPath);
+                    console.log('Canvas recording saved to:', outputPath, hasAudio ? '(with audio)' : '');
                     resolve({ success: true, filePath: outputPath });
                 })
                 .on('error', (err) => {
                     console.error('FFmpeg error:', err);
-                    // Cleanup temp directory
+                    // Cleanup temp directories
                     fs.rmSync(tempDir, { recursive: true, force: true });
+                    if (audioRecordingSession?.tempDir) {
+                        fs.rmSync(audioRecordingSession.tempDir, { recursive: true, force: true });
+                        audioRecordingSession = null;
+                    }
                     canvasRecordingSession = null;
                     
                     reject({ success: false, error: err.message });
