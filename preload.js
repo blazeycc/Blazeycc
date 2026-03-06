@@ -82,6 +82,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Copy to clipboard
     copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', text),
     
+    // Pro+ Features
+    cloudUploadThumbnail: (videoKey, thumbnailPath) => ipcRenderer.invoke('cloud-upload-thumbnail', { videoKey, thumbnailPath }),
+    cloudSetDownloadEnabled: (videoKey, enabled) => ipcRenderer.invoke('cloud-set-download-enabled', { videoKey, enabled }),
+    
+    // Pro Max Features
+    cloudGetEmbedCode: (videoKey) => ipcRenderer.invoke('cloud-get-embed-code', videoKey),
+    cloudGetVideoAnalytics: (videoKey) => ipcRenderer.invoke('cloud-get-video-analytics', videoKey),
+    
+    // YouTube/Vimeo Export (Pro+)
+    exportToYouTube: (filePath) => ipcRenderer.invoke('export-to-youtube', filePath),
+    exportToVimeo: (filePath) => ipcRenderer.invoke('export-to-vimeo', filePath),
+    
     // Canvas-based recording (alternative to MediaRecorder)
     startCanvasRecording: () => ipcRenderer.invoke('start-canvas-recording'),
     captureFrame: (frameData) => ipcRenderer.invoke('capture-frame', frameData),

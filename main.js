@@ -736,6 +736,104 @@ ipcMain.handle('cloud-storage-preview-url', async (event, key) => {
     return { success: true, url: previewUrl };
 });
 
+// Upload custom thumbnail for a video (Pro+)
+ipcMain.handle('cloud-upload-thumbnail', async (event, { videoKey, thumbnailPath }) => {
+    const license = store.get('license', null);
+    if (!license?.email || !license?.key) {
+        return { success: false, error: 'Pro+ license required' };
+    }
+    
+    try {
+        const fileData = fs.readFileSync(thumbnailPath);
+        const url = `${LICENSE_API_URL}/storage/thumbnail?email=${encodeURIComponent(license.email)}&licenseKey=${encodeURIComponent(license.key)}&videoKey=${encodeURIComponent(videoKey)}`;
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'image/jpeg' },
+            body: fileData
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Thumbnail upload failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Set download enabled/disabled for a video (Pro+)
+ipcMain.handle('cloud-set-download-enabled', async (event, { videoKey, enabled }) => {
+    const license = store.get('license', null);
+    if (!license?.email || !license?.key) {
+        return { success: false, error: 'Pro+ license required' };
+    }
+    
+    try {
+        const response = await fetch(`${LICENSE_API_URL}/storage/download-setting`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: license.email,
+                licenseKey: license.key,
+                videoKey,
+                allowDownload: enabled
+            })
+        });
+        return await response.json();
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Get embed code for a video (Pro Max)
+ipcMain.handle('cloud-get-embed-code', async (event, videoKey) => {
+    const license = store.get('license', null);
+    if (!license?.email || !license?.key) {
+        return { success: false, error: 'Pro Max license required' };
+    }
+    
+    try {
+        const url = `${LICENSE_API_URL}/storage/embed?email=${encodeURIComponent(license.email)}&licenseKey=${encodeURIComponent(license.key)}&videoKey=${encodeURIComponent(videoKey)}`;
+        const response = await fetch(url);
+        return await response.json();
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Get video analytics (Pro Max)
+ipcMain.handle('cloud-get-video-analytics', async (event, videoKey) => {
+    const license = store.get('license', null);
+    if (!license?.email || !license?.key) {
+        return { success: false, error: 'Pro Max license required' };
+    }
+    
+    try {
+        const url = `${LICENSE_API_URL}/storage/analytics?email=${encodeURIComponent(license.email)}&licenseKey=${encodeURIComponent(license.key)}&videoKey=${encodeURIComponent(videoKey)}`;
+        const response = await fetch(url);
+        return await response.json();
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Export to YouTube - opens YouTube Studio upload page
+ipcMain.handle('export-to-youtube', async (event, filePath) => {
+    const { shell } = require('electron');
+    // Open YouTube Studio upload page - user will manually upload
+    // In the future, this could use YouTube API with OAuth
+    shell.openExternal('https://studio.youtube.com/channel/upload');
+    shell.showItemInFolder(filePath);
+    return { success: true, message: 'YouTube Studio opened. Drag your video to upload.' };
+});
+
+// Export to Vimeo - opens Vimeo upload page
+ipcMain.handle('export-to-vimeo', async (event, filePath) => {
+    const { shell } = require('electron');
+    // Open Vimeo upload page - user will manually upload
+    shell.openExternal('https://vimeo.com/upload');
+    shell.showItemInFolder(filePath);
+    return { success: true, message: 'Vimeo opened. Drag your video to upload.' };
+});
+
 // Copy to clipboard
 ipcMain.handle('copy-to-clipboard', async (event, text) => {
     const { clipboard } = require('electron');

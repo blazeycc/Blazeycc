@@ -125,6 +125,23 @@ export default {
             if (path === '/storage/unshare' && request.method === 'POST') {
                 return handleStorageUnshare(request, env, corsHeaders);
             }
+            // Upload custom thumbnail (Pro+)
+            if (path === '/storage/thumbnail' && request.method === 'POST') {
+                return handleThumbnailUpload(request, env, corsHeaders);
+            }
+            // Get embed code for shared video
+            if (path === '/storage/embed' && request.method === 'GET') {
+                return handleGetEmbedCode(request, env, corsHeaders);
+            }
+            // Get video analytics (Pro Max)
+            if (path === '/storage/analytics' && request.method === 'GET') {
+                return handleVideoAnalytics(request, env, corsHeaders);
+            }
+            // Public embed player page
+            if (path.startsWith('/embed/') && request.method === 'GET') {
+                const shareToken = path.replace('/embed/', '');
+                return handleEmbedPlayer(shareToken, request, env, corsHeaders);
+            }
             // Public access to shared video (no auth required)
             if (path.startsWith('/share/') && request.method === 'GET') {
                 const shareToken = path.replace('/share/', '');
@@ -1778,7 +1795,7 @@ async function handlePublicShare(shareToken, request, env, corsHeaders) {
     
     // Look up the file by share token
     const file = await env.DB.prepare(
-        'SELECT r2_key, filename, content_type, share_expires_at FROM cloud_storage WHERE share_token = ?'
+        'SELECT r2_key, filename, content_type, share_expires_at, thumbnail_key, allow_download, email FROM cloud_storage WHERE share_token = ?'
     ).bind(shareToken).first();
     
     if (!file) {
@@ -1790,15 +1807,39 @@ async function handlePublicShare(shareToken, request, env, corsHeaders) {
         return jsonResponse({ error: 'Share link has expired' }, 410, corsHeaders);
     }
     
-    // Get from R2
+    const url = new URL(request.url);
+    const requestType = url.searchParams.get('type');
+    const download = url.searchParams.get('download') === '1';
+    
+    // Serve thumbnail if requested
+    if (requestType === 'thumb' && file.thumbnail_key) {
+        const thumbObject = await env.STORAGE.get(file.thumbnail_key);
+        if (thumbObject) {
+            const headers = new Headers(corsHeaders);
+            headers.set('Content-Type', 'image/jpeg');
+            headers.set('Cache-Control', 'public, max-age=86400');
+            return new Response(thumbObject.body, { headers });
+        }
+    }
+    
+    // Get video from R2
     const object = await env.STORAGE.get(file.r2_key);
     
     if (!object) {
         return jsonResponse({ error: 'File not found' }, 404, corsHeaders);
     }
     
-    const url = new URL(request.url);
-    const download = url.searchParams.get('download') === '1';
+    // Log view for analytics (only once per unique request)
+    await logAnalytics(env.DB, 'video_view', file.email, null, request, { 
+        shareToken, 
+        filename: file.filename,
+        download: download ? 'true' : 'false'
+    });
+    
+    // Check if download is allowed
+    if (download && file.allow_download === 0) {
+        return jsonResponse({ error: 'Download is disabled for this video' }, 403, corsHeaders);
+    }
     
     const headers = new Headers(corsHeaders);
     headers.set('Content-Type', file.content_type || 'video/mp4');
@@ -1911,4 +1952,286 @@ function generateShareToken() {
         token += chars[randomValues[i] % chars.length];
     }
     return token;
+}
+
+// =====================
+// PRO+ FEATURES
+// =====================
+
+// Upload custom thumbnail for a video
+async function handleThumbnailUpload(request, env, corsHeaders) {
+    const r2Check = checkR2Available(env, corsHeaders);
+    if (r2Check) return r2Check;
+    
+    const url = new URL(request.url);
+    const email = url.searchParams.get('email');
+    const licenseKey = url.searchParams.get('licenseKey');
+    const videoKey = url.searchParams.get('videoKey');
+    const contentType = request.headers.get('content-type') || 'image/jpeg';
+    
+    if (!email || !videoKey) {
+        return jsonResponse({ error: 'Email and videoKey required' }, 400, corsHeaders);
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Verify license and tier (Pro+ or higher)
+    const tier = await getUserTier(env, normalizedEmail);
+    if (!tier || tier === 'pro') {
+        return jsonResponse({ error: 'Custom thumbnails require Pro+ or higher' }, 403, corsHeaders);
+    }
+    
+    // Verify license is valid
+    const licenseValid = await verifyLicenseKey(env, normalizedEmail, licenseKey);
+    if (!licenseValid) {
+        return jsonResponse({ error: 'Invalid license' }, 401, corsHeaders);
+    }
+    
+    // Verify the video belongs to this user
+    const video = await env.DB.prepare(
+        'SELECT id FROM cloud_storage WHERE r2_key = ? AND email = ?'
+    ).bind(videoKey, normalizedEmail).first();
+    
+    if (!video) {
+        return jsonResponse({ error: 'Video not found' }, 404, corsHeaders);
+    }
+    
+    // Generate thumbnail key
+    const thumbnailKey = `${videoKey}.thumb`;
+    
+    // Upload thumbnail to R2
+    await env.STORAGE.put(thumbnailKey, request.body, {
+        httpMetadata: { contentType },
+        customMetadata: {
+            email: normalizedEmail,
+            videoKey,
+            type: 'thumbnail'
+        }
+    });
+    
+    // Update database
+    await env.DB.prepare(
+        'UPDATE cloud_storage SET thumbnail_key = ? WHERE r2_key = ? AND email = ?'
+    ).bind(thumbnailKey, videoKey, normalizedEmail).run();
+    
+    await logAnalytics(env.DB, 'thumbnail_upload', normalizedEmail, licenseKey, request, { videoKey });
+    
+    return jsonResponse({ success: true, thumbnailKey }, 200, corsHeaders);
+}
+
+// Get embed code for a shared video
+async function handleGetEmbedCode(request, env, corsHeaders) {
+    const url = new URL(request.url);
+    const email = url.searchParams.get('email');
+    const licenseKey = url.searchParams.get('licenseKey');
+    const videoKey = url.searchParams.get('videoKey');
+    
+    if (!email || !videoKey) {
+        return jsonResponse({ error: 'Email and videoKey required' }, 400, corsHeaders);
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Verify license and tier (Pro Max only)
+    const tier = await getUserTier(env, normalizedEmail);
+    if (!tier || (tier !== 'pro_max' && tier !== 'pro-max')) {
+        return jsonResponse({ error: 'Embed codes require Pro Max' }, 403, corsHeaders);
+    }
+    
+    // Verify license is valid
+    const licenseValid = await verifyLicenseKey(env, normalizedEmail, licenseKey);
+    if (!licenseValid) {
+        return jsonResponse({ error: 'Invalid license' }, 401, corsHeaders);
+    }
+    
+    // Get video share info
+    const video = await env.DB.prepare(
+        'SELECT share_token, filename FROM cloud_storage WHERE r2_key = ? AND email = ?'
+    ).bind(videoKey, normalizedEmail).first();
+    
+    if (!video) {
+        return jsonResponse({ error: 'Video not found' }, 404, corsHeaders);
+    }
+    
+    if (!video.share_token) {
+        return jsonResponse({ error: 'Video must be shared first' }, 400, corsHeaders);
+    }
+    
+    const baseUrl = 'https://blazeycc-license.kennethhy-me.workers.dev';
+    const embedUrl = `${baseUrl}/embed/${video.share_token}`;
+    const directUrl = `${baseUrl}/share/${video.share_token}`;
+    
+    // Generate different embed code formats
+    const iframe = `<iframe src="${embedUrl}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
+    const videoTag = `<video src="${directUrl}" width="640" height="360" controls></video>`;
+    const link = directUrl;
+    
+    return jsonResponse({ 
+        embedUrl,
+        directUrl,
+        codes: {
+            iframe,
+            video: videoTag,
+            link
+        }
+    }, 200, corsHeaders);
+}
+
+// Get analytics for a video (Pro Max)
+async function handleVideoAnalytics(request, env, corsHeaders) {
+    const url = new URL(request.url);
+    const email = url.searchParams.get('email');
+    const licenseKey = url.searchParams.get('licenseKey');
+    const videoKey = url.searchParams.get('videoKey');
+    
+    if (!email || !videoKey) {
+        return jsonResponse({ error: 'Email and videoKey required' }, 400, corsHeaders);
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Verify license and tier (Pro Max only)
+    const tier = await getUserTier(env, normalizedEmail);
+    if (!tier || (tier !== 'pro_max' && tier !== 'pro-max')) {
+        return jsonResponse({ error: 'Analytics require Pro Max' }, 403, corsHeaders);
+    }
+    
+    // Verify license is valid
+    const licenseValid = await verifyLicenseKey(env, normalizedEmail, licenseKey);
+    if (!licenseValid) {
+        return jsonResponse({ error: 'Invalid license' }, 401, corsHeaders);
+    }
+    
+    // Get video info
+    const video = await env.DB.prepare(
+        'SELECT share_token FROM cloud_storage WHERE r2_key = ? AND email = ?'
+    ).bind(videoKey, normalizedEmail).first();
+    
+    if (!video || !video.share_token) {
+        return jsonResponse({ error: 'Video not found or not shared' }, 404, corsHeaders);
+    }
+    
+    // Get view analytics
+    const views = await env.DB.prepare(`
+        SELECT 
+            COUNT(*) as total_views,
+            COUNT(DISTINCT COALESCE(metadata, ip_country)) as unique_viewers
+        FROM analytics 
+        WHERE event_type = 'video_view' 
+        AND metadata LIKE ?
+    `).bind(`%${video.share_token}%`).first();
+    
+    // Get views over time (last 30 days)
+    const viewsOverTime = await env.DB.prepare(`
+        SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as views
+        FROM analytics 
+        WHERE event_type = 'video_view' 
+        AND metadata LIKE ?
+        AND created_at >= datetime('now', '-30 days')
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+    `).bind(`%${video.share_token}%`).all();
+    
+    // Get geographic distribution
+    const geoData = await env.DB.prepare(`
+        SELECT 
+            ip_country as country,
+            COUNT(*) as views
+        FROM analytics 
+        WHERE event_type = 'video_view' 
+        AND metadata LIKE ?
+        AND ip_country IS NOT NULL
+        GROUP BY ip_country
+        ORDER BY views DESC
+        LIMIT 10
+    `).bind(`%${video.share_token}%`).all();
+    
+    return jsonResponse({
+        videoKey,
+        totalViews: views?.total_views || 0,
+        uniqueViewers: views?.unique_viewers || 0,
+        viewsOverTime: viewsOverTime?.results || [],
+        topCountries: geoData?.results || []
+    }, 200, corsHeaders);
+}
+
+// Serve embeddable video player page
+async function handleEmbedPlayer(shareToken, request, env, corsHeaders) {
+    const r2Check = checkR2Available(env, corsHeaders);
+    if (r2Check) return r2Check;
+    
+    if (!shareToken || shareToken.length < 10) {
+        return new Response('Invalid embed link', { status: 400, headers: corsHeaders });
+    }
+    
+    // Look up the file by share token
+    const file = await env.DB.prepare(
+        'SELECT r2_key, filename, content_type, share_expires_at, thumbnail_key, email FROM cloud_storage WHERE share_token = ?'
+    ).bind(shareToken).first();
+    
+    if (!file) {
+        return new Response('Video not found', { status: 404, headers: corsHeaders });
+    }
+    
+    // Check if share has expired
+    if (file.share_expires_at && new Date(file.share_expires_at) < new Date()) {
+        return new Response('This video is no longer available', { status: 410, headers: corsHeaders });
+    }
+    
+    const baseUrl = 'https://blazeycc-license.kennethhy-me.workers.dev';
+    const videoUrl = `${baseUrl}/share/${shareToken}`;
+    const thumbnailUrl = file.thumbnail_key ? `${baseUrl}/share/${shareToken}?type=thumb` : '';
+    
+    // Log view for analytics
+    await logAnalytics(env.DB, 'video_view', file.email, null, request, { shareToken, filename: file.filename });
+    
+    // Return HTML embed player
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${file.filename} - Blazeycc</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        video { max-width: 100%; max-height: 100vh; }
+        .branding { position: absolute; bottom: 10px; right: 10px; color: rgba(255,255,255,0.5); font-size: 12px; font-family: system-ui; }
+        .branding a { color: rgba(255,255,255,0.7); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <video controls autoplay ${thumbnailUrl ? `poster="${thumbnailUrl}"` : ''}>
+        <source src="${videoUrl}" type="${file.content_type || 'video/mp4'}">
+        Your browser does not support video playback.
+    </video>
+    <div class="branding">Powered by <a href="https://blazeycc.com" target="_blank">Blazeycc</a></div>
+</body>
+</html>`;
+    
+    const headers = new Headers(corsHeaders);
+    headers.set('Content-Type', 'text/html; charset=utf-8');
+    
+    return new Response(html, { headers });
+}
+
+// Helper to get user tier
+async function getUserTier(env, email) {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Check subscriptions first
+    const subscription = await env.DB.prepare(
+        "SELECT tier FROM subscriptions WHERE email = ? AND status IN ('active', 'trialing')"
+    ).bind(normalizedEmail).first();
+    
+    if (subscription) return subscription.tier;
+    
+    // Check allowed_emails
+    const allowed = await env.DB.prepare(
+        'SELECT tier FROM allowed_emails WHERE email = ?'
+    ).bind(normalizedEmail).first();
+    
+    return allowed?.tier || null;
 }

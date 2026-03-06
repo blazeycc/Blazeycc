@@ -193,12 +193,33 @@
                     </p>
                 </div>
                 <webview id="webview" style="display: none;" allowpopups disablewebsecurity></webview>
+                <!-- Annotation Canvas Overlay (Pro+) -->
+                <canvas id="annotationCanvas" class="annotation-canvas" style="display: none;"></canvas>
             </div>
             <div class="browser-toolbar" id="browserToolbar" style="display: none;">
                 <button id="backBtn" class="btn btn-small">← Back</button>
                 <button id="forwardBtn" class="btn btn-small">Forward →</button>
                 <button id="reloadBtn" class="btn btn-small">🔄 Reload</button>
                 <span id="currentUrl" class="current-url"></span>
+            </div>
+            <!-- Annotation Toolbar (Pro+) -->
+            <div class="annotation-toolbar" id="annotationToolbar" style="display: none;">
+                <button id="annotateToggleBtn" class="btn btn-small annotation-tool" data-tool="toggle" title="Toggle Annotations">✏️ Annotate</button>
+                <div class="annotation-tools" id="annotationTools" style="display: none;">
+                    <button class="btn btn-small annotation-tool active" data-tool="arrow" title="Arrow">➤</button>
+                    <button class="btn btn-small annotation-tool" data-tool="rectangle" title="Rectangle">▢</button>
+                    <button class="btn btn-small annotation-tool" data-tool="circle" title="Circle">○</button>
+                    <button class="btn btn-small annotation-tool" data-tool="highlight" title="Highlight">🖌️</button>
+                    <button class="btn btn-small annotation-tool" data-tool="text" title="Text">T</button>
+                    <input type="color" id="annotationColor" value="#ff0000" class="annotation-color" title="Color">
+                    <select id="annotationSize" class="annotation-size" title="Size">
+                        <option value="2">Thin</option>
+                        <option value="4" selected>Medium</option>
+                        <option value="8">Thick</option>
+                    </select>
+                    <button id="clearAnnotationsBtn" class="btn btn-small btn-danger" title="Clear All">🗑️</button>
+                    <button id="undoAnnotationBtn" class="btn btn-small" title="Undo">↩️</button>
+                </div>
             </div>
         </section>
 

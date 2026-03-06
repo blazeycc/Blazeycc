@@ -68,7 +68,16 @@ const elements = {
     // Progress modal
     progressModal: document.getElementById('progressModal'),
     progressBar: document.getElementById('progressBar'),
-    progressText: document.getElementById('progressText')
+    progressText: document.getElementById('progressText'),
+    // Annotation elements (Pro+)
+    annotationCanvas: document.getElementById('annotationCanvas'),
+    annotationToolbar: document.getElementById('annotationToolbar'),
+    annotationTools: document.getElementById('annotationTools'),
+    annotateToggleBtn: document.getElementById('annotateToggleBtn'),
+    annotationColor: document.getElementById('annotationColor'),
+    annotationSize: document.getElementById('annotationSize'),
+    clearAnnotationsBtn: document.getElementById('clearAnnotationsBtn'),
+    undoAnnotationBtn: document.getElementById('undoAnnotationBtn')
 };
 
 // Format presets - ALL PLATFORMS
@@ -138,7 +147,12 @@ const state = {
     audioMediaRecorder: null,
     audioChunks: [],
     // Pro features
-    customWatermarkSettings: { type: 'none', text: '', position: 'bottom-left', imagePath: null }
+    customWatermarkSettings: { type: 'none', text: '', position: 'bottom-left', imagePath: null },
+    // Annotation state (Pro+)
+    annotationEnabled: false,
+    annotationTool: 'arrow',
+    annotationHistory: [],
+    annotationRedoStack: []
 };
 
 // Initialize
@@ -447,9 +461,14 @@ async function startRecording() {
             state.frameCapturePending = true;
             
             window.electronAPI.captureWebviewFrame(state.webviewWebContentsId)
-                .then(frameResult => {
+                .then(async frameResult => {
                     if (frameResult.success && state.canvasRecordingActive) {
-                        return window.electronAPI.captureFrame(frameResult.data);
+                        // Merge annotations if any
+                        let frameData = frameResult.data;
+                        if (state.annotationEnabled && state.annotationHistory.length > 0) {
+                            frameData = await mergeAnnotationsWithFrame(frameResult.data);
+                        }
+                        return window.electronAPI.captureFrame(frameData);
                     }
                 })
                 .catch(err => {
@@ -2014,7 +2033,333 @@ document.addEventListener('DOMContentLoaded', () => {
     initCustomWatermark();
     initFastEncoding();
     initCloudSync();
+    initAnnotations();
 });
+
+// =====================
+// ANNOTATION FUNCTIONS (Pro+)
+// =====================
+
+let annotationCtx = null;
+let isDrawing = false;
+let startX = 0, startY = 0;
+
+function initAnnotations() {
+    const canvas = elements.annotationCanvas;
+    const toolbar = elements.annotationToolbar;
+    
+    if (!canvas || !toolbar) return;
+    
+    annotationCtx = canvas.getContext('2d');
+    
+    // Check if Pro+ license
+    checkAnnotationAccess();
+    
+    // Setup canvas size when webview loads
+    elements.webview?.addEventListener('dom-ready', () => {
+        resizeAnnotationCanvas();
+        // Show annotation toolbar for Pro+ users
+        checkAnnotationAccess();
+    });
+    
+    // Toggle annotation mode
+    elements.annotateToggleBtn?.addEventListener('click', toggleAnnotationMode);
+    
+    // Tool selection
+    document.querySelectorAll('.annotation-tool[data-tool]').forEach(btn => {
+        if (btn.dataset.tool !== 'toggle') {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.annotation-tool').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.annotationTool = btn.dataset.tool;
+            });
+        }
+    });
+    
+    // Clear annotations
+    elements.clearAnnotationsBtn?.addEventListener('click', clearAnnotations);
+    
+    // Undo
+    elements.undoAnnotationBtn?.addEventListener('click', undoAnnotation);
+    
+    // Canvas drawing events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+    
+    // Window resize
+    window.addEventListener('resize', resizeAnnotationCanvas);
+}
+
+async function checkAnnotationAccess() {
+    try {
+        const tier = await window.electronAPI.getLicenseTier();
+        // Show annotation toolbar for Pro+ or higher
+        if (tier === 'pro+' || tier === 'pro_plus' || tier === 'pro_max' || tier === 'pro-max') {
+            if (elements.annotationToolbar) {
+                elements.annotationToolbar.style.display = 'flex';
+            }
+        }
+    } catch (e) {}
+}
+
+function resizeAnnotationCanvas() {
+    const container = document.getElementById('browserContainer');
+    const canvas = elements.annotationCanvas;
+    
+    if (!container || !canvas) return;
+    
+    canvas.width = container.offsetWidth;
+    canvas.height = container.offsetHeight;
+    
+    // Redraw existing annotations
+    redrawAnnotations();
+}
+
+function toggleAnnotationMode() {
+    state.annotationEnabled = !state.annotationEnabled;
+    const canvas = elements.annotationCanvas;
+    const tools = elements.annotationTools;
+    
+    if (state.annotationEnabled) {
+        canvas.style.display = 'block';
+        canvas.classList.add('active');
+        tools.style.display = 'flex';
+        elements.annotateToggleBtn?.classList.add('active');
+        showNotification('Annotation mode enabled - draw on the screen', 'info');
+    } else {
+        canvas.classList.remove('active');
+        tools.style.display = 'none';
+        elements.annotateToggleBtn?.classList.remove('active');
+    }
+}
+
+function startDrawing(e) {
+    if (!state.annotationEnabled) return;
+    
+    isDrawing = true;
+    const rect = elements.annotationCanvas.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+    
+    if (state.annotationTool === 'text') {
+        isDrawing = false;
+        showTextInput(startX, startY);
+    }
+}
+
+function draw(e) {
+    if (!isDrawing || !state.annotationEnabled) return;
+    
+    const canvas = elements.annotationCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // For highlight, draw continuously
+    if (state.annotationTool === 'highlight') {
+        const color = elements.annotationColor?.value || '#ff0000';
+        const size = parseInt(elements.annotationSize?.value || '4');
+        
+        annotationCtx.globalAlpha = 0.3;
+        annotationCtx.strokeStyle = color;
+        annotationCtx.lineWidth = size * 3;
+        annotationCtx.lineCap = 'round';
+        annotationCtx.beginPath();
+        annotationCtx.moveTo(startX, startY);
+        annotationCtx.lineTo(x, y);
+        annotationCtx.stroke();
+        annotationCtx.globalAlpha = 1;
+        
+        startX = x;
+        startY = y;
+    }
+}
+
+function stopDrawing(e) {
+    if (!isDrawing || !state.annotationEnabled) return;
+    isDrawing = false;
+    
+    const canvas = elements.annotationCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const endX = e.clientX - rect.left;
+    const endY = e.clientY - rect.top;
+    
+    const color = elements.annotationColor?.value || '#ff0000';
+    const size = parseInt(elements.annotationSize?.value || '4');
+    
+    // Save annotation to history
+    const annotation = {
+        tool: state.annotationTool,
+        startX, startY, endX, endY,
+        color, size
+    };
+    
+    state.annotationHistory.push(annotation);
+    state.annotationRedoStack = [];
+    
+    // Draw the shape
+    drawShape(annotation);
+}
+
+function drawShape(ann) {
+    annotationCtx.strokeStyle = ann.color;
+    annotationCtx.fillStyle = ann.color;
+    annotationCtx.lineWidth = ann.size;
+    annotationCtx.lineCap = 'round';
+    annotationCtx.lineJoin = 'round';
+    
+    switch (ann.tool) {
+        case 'arrow':
+            drawArrow(ann.startX, ann.startY, ann.endX, ann.endY, ann.size);
+            break;
+        case 'rectangle':
+            annotationCtx.strokeRect(
+                ann.startX, ann.startY,
+                ann.endX - ann.startX, ann.endY - ann.startY
+            );
+            break;
+        case 'circle':
+            const radiusX = Math.abs(ann.endX - ann.startX) / 2;
+            const radiusY = Math.abs(ann.endY - ann.startY) / 2;
+            const centerX = ann.startX + (ann.endX - ann.startX) / 2;
+            const centerY = ann.startY + (ann.endY - ann.startY) / 2;
+            annotationCtx.beginPath();
+            annotationCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            annotationCtx.stroke();
+            break;
+        case 'text':
+            if (ann.text) {
+                annotationCtx.font = `${ann.size * 4}px sans-serif`;
+                annotationCtx.fillText(ann.text, ann.startX, ann.startY);
+            }
+            break;
+    }
+}
+
+function drawArrow(fromX, fromY, toX, toY, size) {
+    const headLength = size * 4;
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    
+    // Line
+    annotationCtx.beginPath();
+    annotationCtx.moveTo(fromX, fromY);
+    annotationCtx.lineTo(toX, toY);
+    annotationCtx.stroke();
+    
+    // Arrowhead
+    annotationCtx.beginPath();
+    annotationCtx.moveTo(toX, toY);
+    annotationCtx.lineTo(
+        toX - headLength * Math.cos(angle - Math.PI / 6),
+        toY - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    annotationCtx.lineTo(
+        toX - headLength * Math.cos(angle + Math.PI / 6),
+        toY - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    annotationCtx.closePath();
+    annotationCtx.fill();
+}
+
+function showTextInput(x, y) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'annotation-text-input';
+    input.style.left = x + 'px';
+    input.style.top = y + 'px';
+    
+    const container = document.getElementById('browserContainer');
+    container.appendChild(input);
+    input.focus();
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && input.value) {
+            const annotation = {
+                tool: 'text',
+                startX: x, startY: y + 20,
+                endX: x, endY: y,
+                color: elements.annotationColor?.value || '#ff0000',
+                size: parseInt(elements.annotationSize?.value || '4'),
+                text: input.value
+            };
+            state.annotationHistory.push(annotation);
+            drawShape(annotation);
+            input.remove();
+        } else if (e.key === 'Escape') {
+            input.remove();
+        }
+    });
+    
+    input.addEventListener('blur', () => input.remove());
+}
+
+function clearAnnotations() {
+    const canvas = elements.annotationCanvas;
+    annotationCtx.clearRect(0, 0, canvas.width, canvas.height);
+    state.annotationHistory = [];
+    state.annotationRedoStack = [];
+}
+
+function undoAnnotation() {
+    if (state.annotationHistory.length === 0) return;
+    
+    const last = state.annotationHistory.pop();
+    state.annotationRedoStack.push(last);
+    redrawAnnotations();
+}
+
+function redrawAnnotations() {
+    const canvas = elements.annotationCanvas;
+    annotationCtx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    state.annotationHistory.forEach(ann => {
+        if (ann.tool === 'highlight') {
+            annotationCtx.globalAlpha = 0.3;
+        }
+        drawShape(ann);
+        annotationCtx.globalAlpha = 1;
+    });
+}
+
+// Get annotation canvas data for merging with recording
+function getAnnotationImageData() {
+    if (!elements.annotationCanvas) return null;
+    return elements.annotationCanvas.toDataURL('image/png');
+}
+
+// Merge annotations with a video frame
+async function mergeAnnotationsWithFrame(frameData) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const frameImg = new Image();
+        frameImg.onload = () => {
+            canvas.width = frameImg.width;
+            canvas.height = frameImg.height;
+            
+            // Draw the original frame
+            ctx.drawImage(frameImg, 0, 0);
+            
+            // Draw annotations on top
+            const annotationCanvas = elements.annotationCanvas;
+            if (annotationCanvas) {
+                // Scale annotations to match frame size
+                ctx.drawImage(
+                    annotationCanvas, 
+                    0, 0, annotationCanvas.width, annotationCanvas.height,
+                    0, 0, canvas.width, canvas.height
+                );
+            }
+            
+            resolve(canvas.toDataURL('image/png'));
+        };
+        frameImg.onerror = () => resolve(frameData); // Fall back to original
+        frameImg.src = frameData;
+    });
+}
 
 // =====================
 // AUDIO CAPTURE FUNCTIONS
