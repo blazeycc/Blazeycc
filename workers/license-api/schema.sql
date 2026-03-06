@@ -99,6 +99,23 @@ CREATE TABLE IF NOT EXISTS recording_history (
 CREATE INDEX IF NOT EXISTS idx_history_email ON recording_history(email);
 CREATE INDEX IF NOT EXISTS idx_history_date ON recording_history(recorded_at);
 
+-- License activations - track device activations per license (for team seats)
+CREATE TABLE IF NOT EXISTS license_activations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    license_key TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    device_name TEXT,            -- e.g. "Kenneth's MacBook Pro"
+    platform TEXT,               -- 'windows', 'mac', 'linux'
+    app_version TEXT,
+    last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    activated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(license_key, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activations_license ON license_activations(license_key);
+CREATE INDEX IF NOT EXISTS idx_activations_email ON license_activations(email);
+
 -- Stripe subscriptions
 CREATE TABLE IF NOT EXISTS subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

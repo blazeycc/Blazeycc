@@ -70,6 +70,14 @@ export default {
                 return handleTrack(request, env, corsHeaders);
             }
             
+            // Device activations (for team seats)
+            if (path === '/activations' && request.method === 'GET') {
+                return handleGetActivations(request, env, corsHeaders);
+            }
+            if (path === '/activations/deactivate' && request.method === 'POST') {
+                return handleDeactivateDevice(request, env, corsHeaders);
+            }
+            
             // Recording history (synced from app)
             if (path === '/history' && request.method === 'POST') {
                 return handleHistoryAdd(request, env, corsHeaders);
@@ -256,7 +264,7 @@ async function handleGetLicense(request, env, corsHeaders) {
 }
 
 async function handleValidateLicense(request, env, corsHeaders) {
-    const { email, licenseKey } = await request.json();
+    const { email, licenseKey, deviceId, deviceName, platform, appVersion } = await request.json();
     
     if (!email || !licenseKey) {
         return jsonResponse({ error: 'Email and licenseKey required' }, 400, corsHeaders);
@@ -291,6 +299,55 @@ async function handleValidateLicense(request, env, corsHeaders) {
                 'SELECT tier FROM allowed_emails WHERE email = ?'
             ).bind(normalizedEmail).first();
             tier = allowedEntry?.tier || 'pro';
+        }
+        
+        // Seat limits per tier
+        const seatLimits = {
+            'pro': 1,
+            'pro+': 1,
+            'pro_plus': 1,
+            'pro_max': 3,
+            'pro-max': 3
+        };
+        const maxSeats = seatLimits[tier] || 1;
+        
+        // Track device activation if deviceId provided
+        if (deviceId) {
+            // Check existing activations
+            const existingActivation = await env.DB.prepare(
+                'SELECT id FROM license_activations WHERE license_key = ? AND device_id = ?'
+            ).bind(licenseKey, deviceId).first();
+            
+            if (existingActivation) {
+                // Update last seen
+                await env.DB.prepare(
+                    'UPDATE license_activations SET last_seen_at = CURRENT_TIMESTAMP, app_version = ? WHERE id = ?'
+                ).bind(appVersion || null, existingActivation.id).run();
+            } else {
+                // Check seat count
+                const activationCount = await env.DB.prepare(
+                    'SELECT COUNT(*) as count FROM license_activations WHERE license_key = ?'
+                ).bind(licenseKey).first();
+                
+                if (activationCount.count >= maxSeats) {
+                    await logAnalytics(env.DB, 'license_seat_limit_reached', normalizedEmail, licenseKey, request);
+                    return jsonResponse({ 
+                        valid: false, 
+                        error: 'Seat limit reached', 
+                        message: `This license allows ${maxSeats} device(s). Please deactivate another device or upgrade to Pro Max for more seats.`,
+                        currentSeats: activationCount.count,
+                        maxSeats
+                    }, 200, corsHeaders);
+                }
+                
+                // Register new activation
+                await env.DB.prepare(`
+                    INSERT INTO license_activations (email, license_key, device_id, device_name, platform, app_version)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `).bind(normalizedEmail, licenseKey, deviceId, deviceName || null, platform || null, appVersion || null).run();
+                
+                await logAnalytics(env.DB, 'device_activated', normalizedEmail, licenseKey, request);
+            }
         }
     }
     
@@ -381,6 +438,88 @@ async function handleTrack(request, env, corsHeaders) {
     await logAnalytics(env.DB, action, email, licenseKey, request, metadata);
     
     return jsonResponse({ success: true }, 200, corsHeaders);
+}
+
+// =====================
+// DEVICE ACTIVATION HANDLERS
+// =====================
+
+async function handleGetActivations(request, env, corsHeaders) {
+    const url = new URL(request.url);
+    const email = url.searchParams.get('email');
+    const licenseKey = url.searchParams.get('licenseKey');
+    
+    if (!email || !licenseKey) {
+        return jsonResponse({ error: 'Email and licenseKey required' }, 400, corsHeaders);
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Verify license
+    const licenseValid = await verifyLicenseKey(env, normalizedEmail, licenseKey);
+    if (!licenseValid) {
+        return jsonResponse({ error: 'Invalid license' }, 401, corsHeaders);
+    }
+    
+    // Get tier for seat limit info
+    let tier = 'pro';
+    const subscription = await env.DB.prepare(
+        "SELECT tier FROM subscriptions WHERE email = ? AND status IN ('active', 'trialing')"
+    ).bind(normalizedEmail).first();
+    if (subscription) {
+        tier = subscription.tier;
+    } else {
+        const allowedEntry = await env.DB.prepare(
+            'SELECT tier FROM allowed_emails WHERE email = ?'
+        ).bind(normalizedEmail).first();
+        tier = allowedEntry?.tier || 'pro';
+    }
+    
+    const seatLimits = { 'pro': 1, 'pro+': 1, 'pro_plus': 1, 'pro_max': 3, 'pro-max': 3 };
+    const maxSeats = seatLimits[tier] || 1;
+    
+    // Get all activations for this license
+    const activations = await env.DB.prepare(`
+        SELECT id, device_id, device_name, platform, app_version, last_seen_at, activated_at
+        FROM license_activations
+        WHERE license_key = ?
+        ORDER BY last_seen_at DESC
+    `).bind(licenseKey).all();
+    
+    return jsonResponse({
+        activations: activations.results || [],
+        currentSeats: activations.results?.length || 0,
+        maxSeats,
+        tier
+    }, 200, corsHeaders);
+}
+
+async function handleDeactivateDevice(request, env, corsHeaders) {
+    const { email, licenseKey, deviceId } = await request.json();
+    
+    if (!email || !licenseKey || !deviceId) {
+        return jsonResponse({ error: 'Email, licenseKey, and deviceId required' }, 400, corsHeaders);
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Verify license
+    const licenseValid = await verifyLicenseKey(env, normalizedEmail, licenseKey);
+    if (!licenseValid) {
+        return jsonResponse({ error: 'Invalid license' }, 401, corsHeaders);
+    }
+    
+    // Delete the activation
+    const result = await env.DB.prepare(
+        'DELETE FROM license_activations WHERE license_key = ? AND device_id = ?'
+    ).bind(licenseKey, deviceId).run();
+    
+    await logAnalytics(env.DB, 'device_deactivated', normalizedEmail, licenseKey, request);
+    
+    return jsonResponse({ 
+        success: true, 
+        deactivated: result.meta?.changes > 0 
+    }, 200, corsHeaders);
 }
 
 // =====================
