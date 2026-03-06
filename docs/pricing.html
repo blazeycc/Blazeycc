@@ -39,9 +39,9 @@
 
         .pricing-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            max-width: 900px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            max-width: 1200px;
             width: 100%;
         }
 
@@ -112,6 +112,17 @@
             color: var(--text-muted);
             margin-bottom: 2rem;
             min-height: 3rem;
+        }
+
+        .annual-price {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .annual-price .savings {
+            color: #22c55e;
+            font-weight: 600;
         }
 
         .features-list {
@@ -257,7 +268,7 @@
 
     <section class="pricing-hero">
         <h1>Choose Your Plan</h1>
-        <p class="subtitle">Unlock premium recording features with a simple monthly subscription</p>
+        <p class="subtitle">Unlock premium recording features. Pay monthly or save with annual billing.</p>
 
         <div class="pricing-grid">
             <div class="pricing-card">
@@ -267,6 +278,7 @@
                     <span class="price-amount">$5</span>
                     <span class="price-period">/month</span>
                 </div>
+                <p class="annual-price">or $50/year <span class="savings">(save $10)</span></p>
                 <p class="plan-description">Everything you need for professional website recordings</p>
                 <ul class="features-list">
                     <li><span class="feature-check">✓</span> No watermark</li>
@@ -282,23 +294,46 @@
             </div>
 
             <div class="pricing-card popular">
-                <div class="plan-icon">🚀</div>
+                <div class="plan-icon">☁️</div>
                 <h2 class="plan-name">Pro+</h2>
                 <div class="plan-price">
                     <span class="price-amount">$7</span>
                     <span class="price-period">/month</span>
                 </div>
-                <p class="plan-description">For power users who want cloud features</p>
+                <p class="annual-price">or $70/year <span class="savings">(save $14)</span></p>
+                <p class="plan-description">Cloud storage and sharing features</p>
                 <ul class="features-list">
                     <li><span class="feature-check">✓</span> All Pro features</li>
-                    <li><span class="feature-check">✓</span> 5GB cloud storage</li>
+                    <li><span class="feature-check">✓</span> 2GB cloud storage</li>
                     <li><span class="feature-check">✓</span> Shareable video links</li>
-                    <li><span class="feature-check">✓</span> Video analytics</li>
-                    <li><span class="feature-check">✓</span> Custom thumbnails</li>
-                    <li><span class="feature-check">✓</span> Priority support</li>
+                    <li><span class="feature-check">✓</span> Cloud preview streaming</li>
+                    <li><span class="feature-check">✓</span> Export to YouTube/Vimeo</li>
                 </ul>
                 <button class="subscribe-btn" onclick="subscribe('pro_plus')">
                     Subscribe to Pro+
+                </button>
+            </div>
+
+            <div class="pricing-card">
+                <div class="plan-icon">🚀</div>
+                <h2 class="plan-name">Pro Max</h2>
+                <div class="plan-price">
+                    <span class="price-amount">$12</span>
+                    <span class="price-period">/month</span>
+                </div>
+                <p class="annual-price">or $120/year <span class="savings">(save $24)</span></p>
+                <p class="plan-description">Maximum storage and team features</p>
+                <ul class="features-list">
+                    <li><span class="feature-check">✓</span> All Pro+ features</li>
+                    <li><span class="feature-check">✓</span> 15GB cloud storage</li>
+                    <li><span class="feature-check">✓</span> 2 team seats included</li>
+                    <li><span class="feature-check">✓</span> Password-protected links</li>
+                    <li><span class="feature-check">✓</span> Recording analytics</li>
+                    <li><span class="feature-check">✓</span> Embed codes</li>
+                    <li><span class="feature-check">✓</span> Priority support</li>
+                </ul>
+                <button class="subscribe-btn secondary" onclick="subscribe('pro_max')">
+                    Subscribe to Pro Max
                 </button>
             </div>
         </div>

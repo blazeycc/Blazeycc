@@ -15,30 +15,38 @@ Thank you for considering subscribing to Blazeycc Pro! Your support helps keep t
 
 ### Key Features
 
-| Feature | Free | Pro ($5/mo) | Pro+ ($7/mo) |
-|---------|------|-------------|--------------|
-| Record any URL as video | ✅ | ✅ | ✅ |
-| Export to MP4, WebM, GIF | ✅ | ✅ | ✅ |
-| Social media presets (YouTube, TikTok, Instagram, etc.) | ✅ | ✅ | ✅ |
-| Screenshot capture | ✅ | ✅ | ✅ |
-| Bookmarks & history | ✅ | ✅ | ✅ |
-| Auto-scroll recording | ✅ | ✅ | ✅ |
-| **Remove watermark** | ❌ | ✅ | ✅ |
-| **4K export** | ❌ | ✅ | ✅ |
-| **Cloud history sync** | ❌ | ✅ | ✅ |
-| **Custom watermarks** | ❌ | ✅ | ✅ |
-| **Batch recording** | ❌ | ✅ | ✅ |
-| **Scheduled recordings** | ❌ | ✅ | ✅ |
-| **5GB cloud storage** | ❌ | ❌ | ✅ |
-| **Shareable links** | ❌ | ❌ | ✅ |
-| **Cloud preview** | ❌ | ❌ | ✅ |
-| **Export to YouTube/Vimeo** | ❌ | ❌ | ✅ |
+| Feature | Free | Pro ($5/mo) | Pro+ ($7/mo) | Pro Max ($12/mo) |
+|---------|------|-------------|--------------|------------------|
+| Record any URL as video | ✅ | ✅ | ✅ | ✅ |
+| Export to MP4, WebM, GIF | ✅ | ✅ | ✅ | ✅ |
+| Social media presets (YouTube, TikTok, Instagram, etc.) | ✅ | ✅ | ✅ | ✅ |
+| Screenshot capture | ✅ | ✅ | ✅ | ✅ |
+| Bookmarks & history | ✅ | ✅ | ✅ | ✅ |
+| Auto-scroll recording | ✅ | ✅ | ✅ | ✅ |
+| **Remove watermark** | ❌ | ✅ | ✅ | ✅ |
+| **4K export** | ❌ | ✅ | ✅ | ✅ |
+| **Cloud history sync** | ❌ | ✅ | ✅ | ✅ |
+| **Custom watermarks** | ❌ | ✅ | ✅ | ✅ |
+| **Batch recording** | ❌ | ✅ | ✅ | ✅ |
+| **Scheduled recordings** | ❌ | ✅ | ✅ | ✅ |
+| **2GB cloud storage** | ❌ | ❌ | ✅ | ✅ |
+| **Shareable links** | ❌ | ❌ | ✅ | ✅ |
+| **Cloud preview** | ❌ | ❌ | ✅ | ✅ |
+| **Export to YouTube/Vimeo** | ❌ | ❌ | ✅ | ✅ |
+| **15GB cloud storage** | ❌ | ❌ | ❌ | ✅ |
+| **2 team seats included** | ❌ | ❌ | ❌ | ✅ |
+| **Password-protected links** | ❌ | ❌ | ❌ | ✅ |
+| **Recording analytics** | ❌ | ❌ | ❌ | ✅ |
+| **Embed codes** | ❌ | ❌ | ❌ | ✅ |
+| **Priority support** | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
 ## 🎁 Subscription Tiers
 
 ### ☕ $5/month - Pro License
+
+**Or $50/year (save $10 - 2 months free!)**
 
 Unlock professional features to supercharge your workflow:
 
@@ -52,14 +60,30 @@ Unlock professional features to supercharge your workflow:
 
 ### ☁️ $7/month - Pro+ License
 
+**Or $70/year (save $14 - 2 months free!)**
+
 Everything in Pro, plus cloud storage for your recordings:
 
 - ✅ **Everything in Pro**
-- ✅ **5GB Cloud Storage** - save recordings directly to the cloud
+- ✅ **2GB Cloud Storage** - save recordings directly to the cloud
 - ✅ **Shareable links** - generate public links to share your recordings
 - ✅ **Cloud preview** - stream videos without downloading
 - ✅ **Export to YouTube/Vimeo** - one-click export workflow
 - ✅ Access your videos from any device
+
+### 🚀 $12/month - Pro Max License
+
+**Or $120/year (save $24 - 2 months free!)**
+
+Everything in Pro+, with expanded storage and team features:
+
+- ✅ **Everything in Pro+**
+- ✅ **15GB Cloud Storage** - plenty of room for all your recordings
+- ✅ **2 team seats included** - invite collaborators to your workspace
+- ✅ **Password-protected links** - secure your shared recordings
+- ✅ **Recording analytics** - views, watch time, and viewer insights
+- ✅ **Embed codes** - embed recordings directly on any website
+- ✅ **Priority support** - faster response times for your issues
 
 ---
 
