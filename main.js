@@ -146,7 +146,7 @@ function createWindow() {
 
     // Load the app - vite build goes to dist/, dev server runs differently
     if (app.isPackaged) {
-        mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+        mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
     } else {
         // In development, load from dist after vite build
         mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
