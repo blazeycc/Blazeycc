@@ -1501,24 +1501,6 @@ async function redeemPromoCode() {
 async function openStripeCheckout() {
     showNotification('Payments disabled - all features free!', 'info');
 }
-    
-    try {
-        showNotification('Opening checkout...', 'info');
-        const result = await window.electronAPI.createStripeCheckout(email, 'pro');
-        
-        if (result.url) {
-            // Open Stripe checkout in default browser
-            window.electronAPI.openExternal(result.url);
-            showNotification('Checkout opened in your browser', 'success');
-        } else if (result.error) {
-            showNotification(result.error, 'error');
-        }
-    } catch (error) {
-        // Fallback to website
-        window.electronAPI.openExternal('https://blazeycc.com/pricing');
-        showNotification('Opening pricing page...', 'info');
-    }
-}
 
 // Helper to check if Pro features are enabled
 function isProEnabled() {
