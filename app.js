@@ -377,7 +377,12 @@ function formatUrl(input) {
         return { valid: false, error: 'Please enter a URL' };
     }
     if (!url.match(/^https?:\/\//i)) {
-        url = 'https://' + url;
+        // Use http for localhost, https for everything else
+        if (url.match(/^localhost|^127\.\d+\.\d+\.\d+/)) {
+            url = 'http://' + url;
+        } else {
+            url = 'https://' + url;
+        }
     }
     try {
         new URL(url);
