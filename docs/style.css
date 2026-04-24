@@ -392,14 +392,17 @@ nav {
 }
 
 .download-cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
     gap: 2rem;
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
 }
 
 .download-card {
+    flex: 1;
+    min-width: 0;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -614,7 +617,7 @@ footer {
     }
 
     .download-cards {
-        grid-template-columns: repeat(3, 1fr);
+        flex-direction: row;
         gap: 0.75rem;
     }
     
