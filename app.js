@@ -895,22 +895,7 @@ async function clearHistory() {
 // =====================
 
 async function toggleCloudLibraryPanel() {
-    // Check if Pro+ license (cloud storage requires Pro+)
-    const isProPlus = await window.electronAPI.isProPlusLicensed();
-    if (!isProPlus) {
-        showNotification('Cloud Library requires a Pro+ license ($7/mo)', 'error');
-        return;
-    }
-    
-    const isVisible = elements.cloudLibraryPanel.style.display !== 'none';
-    if (!isVisible) {
-        elements.cloudLibraryPanel.style.display = 'block';
-        elements.historyPanel.style.display = 'none';
-        elements.settingsPanel.style.display = 'none';
-        await loadCloudLibrary();
-    } else {
-        elements.cloudLibraryPanel.style.display = 'none';
-    }
+    showNotification('Cloud sync coming in a future update', 'info');
 }
 
 async function loadCloudLibrary() {
