@@ -11,6 +11,7 @@ const elements = {
     placeholder: document.getElementById('placeholder'),
     webview: document.getElementById('webview'),
     browserContainer: document.getElementById('browserContainer'),
+    browserViewport: document.getElementById('browserViewport'),
     browserToolbar: document.getElementById('browserToolbar'),
     backBtn: document.getElementById('backBtn'),
     forwardBtn: document.getElementById('forwardBtn'),
@@ -222,6 +223,7 @@ async function init() {
             const format = btn.dataset.format;
             elements.formatPreset.value = preset;
             elements.outputFormat.value = format;
+            resizeBrowserViewport(preset);
             updateSettingsInfo();
             showNotification(`Set to ${btn.textContent.trim()} preset`, 'info');
         });
@@ -270,7 +272,10 @@ async function init() {
 
     // Settings event listeners
     elements.outputFormat.addEventListener('change', updateSettingsInfo);
-    elements.formatPreset.addEventListener('change', updateSettingsInfo);
+    elements.formatPreset.addEventListener('change', () => {
+        resizeBrowserViewport(elements.formatPreset.value);
+        updateSettingsInfo();
+    });
     elements.qualitySetting.addEventListener('change', updateSettingsInfo);
     elements.customWidth.addEventListener('input', updateSettingsInfo);
     elements.customHeight.addEventListener('input', updateSettingsInfo);
@@ -312,6 +317,9 @@ async function init() {
     await loadSavePath();
     await loadLicense();
 
+    // Apply initial viewport size for the default preset
+    resizeBrowserViewport(elements.formatPreset.value);
+
     showNotification('Ready! Enter a URL to get started.', 'info');
 }
 
@@ -329,9 +337,16 @@ function getExportSettings() {
         presetName = 'Custom';
     } else {
         const presetData = FORMAT_PRESETS[preset];
-        width = presetData.width;
-        height = presetData.height;
         presetName = presetData.name;
+        
+        // Use browser/webview dimensions for all platform presets
+        if (elements.webview && elements.webview.offsetWidth > 0) {
+            width = elements.webview.offsetWidth;
+            height = elements.webview.offsetHeight;
+        } else {
+            width = presetData.width;
+            height = presetData.height;
+        }
     }
     
     return { width, height, quality, format, presetName };
@@ -355,6 +370,38 @@ function updateSettingsInfo() {
     const formatLabel = format === 'gif' ? 'GIF' : format === 'webm' ? 'WebM' : 'MP4';
     
     elements.settingsInfo.textContent = `Output: ${formatLabel} • ${width}×${height} • ${qualityLabels[quality]} Quality • ${presetName}`;
+}
+
+// Resize the browser viewport to match the selected preset
+function resizeBrowserViewport(preset) {
+    if (!elements.browserViewport) return;
+    
+    if (preset === 'custom') {
+        elements.browserViewport.style.width = '100%';
+        elements.browserViewport.style.height = '100%';
+        return;
+    }
+    
+    const presetData = FORMAT_PRESETS[preset];
+    if (!presetData) return;
+    
+    // Calculate max available size while preserving aspect ratio
+    const containerWidth = elements.browserContainer.clientWidth;
+    const containerHeight = elements.browserContainer.clientHeight;
+    const presetWidth = presetData.width;
+    const presetHeight = presetData.height;
+    
+    const scale = Math.min(
+        containerWidth / presetWidth,
+        containerHeight / presetHeight,
+        1 // Don't upscale beyond native resolution
+    );
+    
+    const displayWidth = Math.round(presetWidth * scale);
+    const displayHeight = Math.round(presetHeight * scale);
+    
+    elements.browserViewport.style.width = displayWidth + 'px';
+    elements.browserViewport.style.height = displayHeight + 'px';
 }
 
 // Format URL
@@ -2126,28 +2173,46 @@ async function startAudioCapture() {
         // Inject audio capture into the webview using Web Audio API
         const result = await webview.executeJavaScript(`
             (function() {
-                if (window.__blazeyccAudioRecorder) return 'already_started';
+                if (window.__blazeyccAudioRecorder) return { status: 'already_started' };
 
                 try {
                     var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    audioCtx.resume().catch(function(){});
                     var dest = audioCtx.createMediaStreamDestination();
                     window.__blazeyccAudioCtx = audioCtx;
                     window.__blazeyccAudioDest = dest;
                     window.__blazeyccAudioChunks = [];
+                    var connectedCount = 0;
 
                     // Connect a media element to the capture graph
                     var connectEl = function(el) {
                         if (el.__blazeyccConnected) return;
                         try {
+                            // Try setting crossOrigin to help with CORS media
+                            if (!el.crossOrigin && el.src) {
+                                el.crossOrigin = 'anonymous';
+                            }
                             var src = audioCtx.createMediaElementSource(el);
                             src.connect(dest);
                             src.connect(audioCtx.destination); // keep audible
                             el.__blazeyccConnected = true;
+                            connectedCount++;
                         } catch(e) {}
                     };
 
-                    // Hook up existing audio/video elements
-                    document.querySelectorAll('audio, video').forEach(connectEl);
+                    // Recursively find media elements including inside iframes
+                    var findAndConnect = function(doc) {
+                        if (!doc) return;
+                        doc.querySelectorAll('audio, video').forEach(connectEl);
+                        doc.querySelectorAll('iframe').forEach(function(iframe) {
+                            try {
+                                if (iframe.contentDocument) {
+                                    findAndConnect(iframe.contentDocument);
+                                }
+                            } catch(e) {}
+                        });
+                    };
+                    findAndConnect(document);
 
                     // Watch for dynamically added elements
                     var observer = new MutationObserver(function(mutations) {
@@ -2158,6 +2223,13 @@ async function startAudioCapture() {
                                 }
                                 if (node.querySelectorAll) {
                                     node.querySelectorAll('audio, video').forEach(connectEl);
+                                    node.querySelectorAll('iframe').forEach(function(iframe) {
+                                        try {
+                                            if (iframe.contentDocument) {
+                                                findAndConnect(iframe.contentDocument);
+                                            }
+                                        } catch(e) {}
+                                    });
                                 }
                             });
                         });
@@ -2167,30 +2239,59 @@ async function startAudioCapture() {
                     }
                     window.__blazeyccAudioObserver = observer;
 
+                    // Also hook window.Audio constructor for programmatic audio
+                    var OriginalAudio = window.Audio;
+                    window.Audio = function() {
+                        var audio = new (Function.prototype.bind.apply(OriginalAudio, [null].concat(Array.prototype.slice.call(arguments))));
+                        setTimeout(function() { connectEl(audio); }, 0);
+                        return audio;
+                    };
+                    window.Audio.prototype = OriginalAudio.prototype;
+
+                    // Determine supported mimeType
+                    var mimeType = 'audio/webm;codecs=opus';
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = 'audio/webm';
+                    }
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = 'audio/mp4';
+                    }
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = '';
+                    }
+
                     // Start recording the captured stream
-                    var recorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
+                    var recorder = mimeType 
+                        ? new MediaRecorder(dest.stream, { mimeType: mimeType })
+                        : new MediaRecorder(dest.stream);
                     window.__blazeyccAudioRecorder = recorder;
+                    window.__blazeyccAudioMimeType = mimeType || recorder.mimeType;
                     recorder.ondataavailable = function(e) {
-                        if (e.data.size > 0) window.__blazeyccAudioChunks.push(e.data);
+                        if (e.data && e.data.size > 0) window.__blazeyccAudioChunks.push(e.data);
                     };
                     recorder.start(1000);
-                    return 'started';
+                    return { status: 'started', connected: connectedCount, mimeType: window.__blazeyccAudioMimeType };
                 } catch(e) {
-                    return 'error: ' + e.message;
+                    return { status: 'error', message: e.message };
                 }
             })()
         `, true);
 
-        if (result === 'started') {
+        if (result && result.status === 'started') {
             state.audioMediaRecorder = true;
-            console.log('Webview audio capture started');
-        } else if (result === 'already_started') {
+            console.log('Webview audio capture started, connected elements:', result.connected, 'mimeType:', result.mimeType);
+            if (result.connected === 0) {
+                console.warn('No audio/video elements were connected - audio may be silent');
+            }
+        } else if (result && result.status === 'already_started') {
             console.log('Webview audio capture already running');
         } else {
             console.log('Webview audio capture failed:', result);
+            showNotification('Audio capture failed: ' + (result && result.message ? result.message : 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Failed to start webview audio capture:', error);
+        showNotification('Audio capture failed: ' + error.message, 'error');
     }
 }
 
@@ -2203,16 +2304,17 @@ async function stopAudioCapture() {
 
     try {
         // Stop recorder in webview and get base64 data back
-        const base64Data = await webview.executeJavaScript(`
+        const result = await webview.executeJavaScript(`
             new Promise(function(resolve) {
                 var recorder = window.__blazeyccAudioRecorder;
                 if (!recorder) {
-                    resolve(null);
+                    resolve({ base64: null, size: 0 });
                     return;
                 }
 
                 recorder.onstop = function() {
-                    var blob = new Blob(window.__blazeyccAudioChunks, { type: 'audio/webm' });
+                    var mimeType = window.__blazeyccAudioMimeType || 'audio/webm';
+                    var blob = new Blob(window.__blazeyccAudioChunks, { type: mimeType });
 
                     // Clean up
                     if (window.__blazeyccAudioObserver) {
@@ -2227,13 +2329,13 @@ async function stopAudioCapture() {
                     window.__blazeyccAudioDest = null;
 
                     if (blob.size === 0) {
-                        resolve(null);
+                        resolve({ base64: null, size: 0 });
                         return;
                     }
 
                     var reader = new FileReader();
                     reader.onloadend = function() {
-                        resolve(reader.result.split(',')[1]);
+                        resolve({ base64: reader.result.split(',')[1], size: blob.size });
                     };
                     reader.readAsDataURL(blob);
                 };
@@ -2242,19 +2344,24 @@ async function stopAudioCapture() {
             })
         `, true);
 
-        if (base64Data) {
+        if (result && result.base64) {
+            console.log('Audio blob size from webview:', result.size);
             const startResult = await window.electronAPI.startAudioCapture();
             if (startResult.success) {
-                await window.electronAPI.saveAudioChunk(base64Data);
+                await window.electronAPI.saveAudioChunk(result.base64);
                 const stopResult = await window.electronAPI.stopAudioCapture();
                 if (stopResult.success) {
                     console.log('Audio saved to:', stopResult.audioPath);
                     return stopResult.audioPath;
                 }
             }
+        } else {
+            console.warn('No audio data captured from webview');
+            showNotification('No audio captured - the page may not have playable media', 'warning');
         }
     } catch (error) {
         console.error('Failed to stop webview audio capture:', error);
+        showNotification('Audio save failed: ' + error.message, 'error');
     }
 
     return null;

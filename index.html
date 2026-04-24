@@ -184,17 +184,19 @@
         <!-- Browser Section (webview) -->
         <section class="browser-section">
             <div class="browser-container" id="browserContainer">
-                <div class="placeholder" id="placeholder">
-                    <div class="placeholder-icon">🌐</div>
-                    <p><strong>Enter a URL above to load a website</strong></p>
-                    <p class="subtitle-text">
-                        The website will appear here<br>
-                        You can interact with it and record your session
-                    </p>
+                <div class="browser-viewport" id="browserViewport">
+                    <div class="placeholder" id="placeholder">
+                        <div class="placeholder-icon">🌐</div>
+                        <p><strong>Enter a URL above to load a website</strong></p>
+                        <p class="subtitle-text">
+                            The website will appear here<br>
+                            You can interact with it and record your session
+                        </p>
+                    </div>
+                    <webview id="webview" style="display: none;" allowpopups disablewebsecurity></webview>
+                    <!-- Annotation Canvas Overlay (Pro+) -->
+                    <canvas id="annotationCanvas" class="annotation-canvas" style="display: none;"></canvas>
                 </div>
-                <webview id="webview" style="display: none;" allowpopups disablewebsecurity></webview>
-                <!-- Annotation Canvas Overlay (Pro+) -->
-                <canvas id="annotationCanvas" class="annotation-canvas" style="display: none;"></canvas>
             </div>
             <div class="browser-toolbar" id="browserToolbar" style="display: none;">
                 <button id="backBtn" class="btn btn-small">← Back</button>
