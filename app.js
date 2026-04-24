@@ -1198,10 +1198,15 @@ async function toggleSettingsPanel() {
     elements.historyPanel.style.display = 'none';
     elements.cloudLibraryPanel.style.display = 'none';
     
-    // All features enabled by default
+    // Load cloud storage usage for Pro users
     if (!isVisible) {
-        // No longer check license - all features free
-        const usage = { success: false };
+        const isPro = await window.electronAPI.isProLicensed();
+        if (isPro) {
+            const usage = await window.electronAPI.cloudStorageUsage();
+            if (usage.success) {
+                updateStorageDisplay(usage);
+            }
+        }
     }
 }
 
@@ -1360,7 +1365,7 @@ function stopAutoScroll() {
 }
 
 // License management
-let isProLicensed = true;
+let isProLicensed = false;
 let isProPlusLicensed = false;
 let licenseTier = null;
 
