@@ -301,7 +301,7 @@ async function init() {
     // Settings panel
     elements.settingsBtn.addEventListener('click', toggleSettingsPanel);
     elements.closeSettingsBtn.addEventListener('click', () => elements.settingsPanel.style.display = 'none');
-    elements.changeSavePathBtn.addEventListener('click', changeSavePath);
+    document.getElementById('changeSavePathBtn')?.addEventListener('click', changeSavePath);
     
     // Initialize settings display
     updateSettingsInfo();
