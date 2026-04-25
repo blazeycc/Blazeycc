@@ -257,6 +257,16 @@
                         <input type="file" id="folderPickerFallback" webkitdirectory directory style="display:none" />
                     </div>
                 </div>
+                <div class="setting-item">
+                    <label for="frameRateSelect">Recording Frame Rate</label>
+                    <select id="frameRateSelect" class="select-input">
+                        <option value="5">Cinematic (5 FPS) — Smooth UI, smaller files</option>
+                        <option value="10">Smooth (10 FPS) — Balanced</option>
+                        <option value="15">High (15 FPS) — Crisp motion</option>
+                        <option value="30">Ultra (30 FPS) — Best with GPU encoding</option>
+                    </select>
+                    <p class="help-text">Higher FPS = smoother video, but may cause UI lag without GPU encoding.</p>
+                </div>
                 <div class="setting-item" id="gpuEncodingSetting">
                     <label>
                         <input type="checkbox" id="gpuEncodingToggle" disabled>

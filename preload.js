@@ -118,6 +118,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setGpuEncoding: (enabled) => ipcRenderer.invoke('set-gpu-encoding', enabled),
     detectGpuEncoder: () => ipcRenderer.invoke('detect-gpu-encoder'),
     
+    // Frame rate
+    getFrameRate: () => ipcRenderer.invoke('get-frame-rate'),
+    setFrameRate: (fps) => ipcRenderer.invoke('set-frame-rate', fps),
+    
     // Auto-update
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('download-update'),

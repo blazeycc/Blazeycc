@@ -57,6 +57,7 @@ const elements = {
     gpuEncodingSetting: document.getElementById('gpuEncodingSetting'),
     gpuEncodingToggle: document.getElementById('gpuEncodingToggle'),
     gpuEncoderInfo: document.getElementById('gpuEncoderInfo'),
+    frameRateSelect: document.getElementById('frameRateSelect'),
     // New elements
     themeToggleBtn: document.getElementById('themeToggleBtn'),
     autoScrollToggle: document.getElementById('autoScrollToggle'),
@@ -318,6 +319,7 @@ async function init() {
     await loadBookmarks();
     await loadHistory();
     await loadSavePath();
+    await loadFrameRate();
     await loadGpuEncoding();
     await loadLicense();
 
@@ -489,7 +491,12 @@ async function startRecording() {
         state.timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
         
-        // Start frame capture loop (5fps = 200ms interval for smooth, lag-free recording)
+        // Get selected frame rate from settings
+        const captureFps = await window.electronAPI.getFrameRate();
+        const captureIntervalMs = Math.round(1000 / captureFps);
+        console.log(`Recording at ${captureFps} FPS (${captureIntervalMs}ms interval)`);
+        
+        // Start frame capture loop
         state.frameCapturePending = false;
         state.droppedFrames = 0;
         
@@ -531,7 +538,7 @@ async function startRecording() {
                 .finally(() => {
                     state.frameCapturePending = false;
                 });
-        }, 200); // 5fps for smooth, lag-free website recordings
+        }, captureIntervalMs);
         
         // Start audio capture if enabled
         if (state.audioEnabled) {
@@ -1223,6 +1230,23 @@ async function toggleSettingsPanel() {
 async function loadSavePath() {
     const savePath = await window.electronAPI.getSavePath();
     elements.savePathInput.value = savePath;
+}
+
+async function loadFrameRate() {
+    try {
+        const fps = await window.electronAPI.getFrameRate();
+        if (elements.frameRateSelect) {
+            elements.frameRateSelect.value = String(fps);
+            
+            elements.frameRateSelect.addEventListener('change', async (e) => {
+                const selectedFps = parseInt(e.target.value);
+                await window.electronAPI.setFrameRate(selectedFps);
+                showNotification(`Frame rate set to ${selectedFps} FPS`, 'info');
+            });
+        }
+    } catch (e) {
+        console.log('Frame rate load failed:', e);
+    }
 }
 
 async function loadGpuEncoding() {

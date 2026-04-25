@@ -228,7 +228,8 @@ const store = new Store({
         bookmarks: [],
         history: [],
         theme: 'dark',
-        gpuEncoding: false
+        gpuEncoding: false,
+        frameRate: 5
     }
 });
 
@@ -636,6 +637,16 @@ ipcMain.handle('set-gpu-encoding', async (event, enabled) => {
 
 ipcMain.handle('detect-gpu-encoder', async () => {
     return detectGpuEncoder();
+});
+
+// Frame rate settings
+ipcMain.handle('get-frame-rate', async () => {
+    return store.get('frameRate', 5);
+});
+
+ipcMain.handle('set-frame-rate', async (event, fps) => {
+    store.set('frameRate', fps);
+    return fps;
 });
 
 // License management - all features are free, no external validation
