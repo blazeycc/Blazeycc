@@ -508,6 +508,106 @@ nav {
     text-decoration: underline;
 }
 
+/* Section subtitle */
+.section-subtitle {
+    text-align: center;
+    color: var(--text-muted);
+    margin-bottom: 3rem;
+    font-size: 1.125rem;
+}
+
+/* Advanced Features Section */
+.advanced-features {
+    padding: 6rem 2rem;
+    background: var(--bg-card);
+}
+
+.advanced-features h2,
+.use-cases h2 {
+    font-size: 2.5rem;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.advanced-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+}
+
+.advanced-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    transition: all 0.3s;
+}
+
+.advanced-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-4px);
+}
+
+.advanced-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.advanced-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.advanced-card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+/* Use Cases Section */
+.use-cases {
+    padding: 6rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.use-cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 3rem;
+}
+
+.use-case-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.use-case-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-4px);
+}
+
+.use-case-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.use-case-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.use-case-card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
 /* Support Section */
 .support {
     padding: 6rem 2rem;
@@ -612,7 +712,9 @@ footer {
         display: none;
     }
 
-    .features-grid {
+    .features-grid,
+    .advanced-grid,
+    .use-cases-grid {
         grid-template-columns: 1fr;
     }
 
