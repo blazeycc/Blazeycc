@@ -97,6 +97,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Canvas-based recording (alternative to MediaRecorder)
     startCanvasRecording: () => ipcRenderer.invoke('start-canvas-recording'),
     captureFrame: (frameData) => ipcRenderer.invoke('capture-frame', frameData),
+    captureFrameBuffer: (buffer) => ipcRenderer.invoke('capture-frame-buffer', buffer),
     stopCanvasRecording: (format, quality, width, height, proSettings) => 
         ipcRenderer.invoke('stop-canvas-recording', { format, quality, width, height, proSettings }),
     cancelCanvasRecording: () => ipcRenderer.invoke('cancel-canvas-recording'),

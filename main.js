@@ -878,6 +878,35 @@ ipcMain.handle('capture-frame', async (event, frameData) => {
     }
 });
 
+// Capture frame from raw buffer (avoids base64 corruption)
+ipcMain.handle('capture-frame-buffer', async (event, buffer) => {
+    if (!canvasRecordingSession) {
+        return { success: false, error: 'No active recording session' };
+    }
+    
+    try {
+        const frameNumber = canvasRecordingSession.frameCount++;
+        const framePath = path.join(canvasRecordingSession.tempDir, `frame_${String(frameNumber).padStart(6, '0')}.png`);
+        
+        // buffer is a Uint8Array/Buffer sent directly over IPC
+        const nodeBuffer = Buffer.from(buffer);
+        
+        // Track pending writes
+        pendingFrameWrites++;
+        fs.promises.writeFile(framePath, nodeBuffer)
+            .then(() => pendingFrameWrites--)
+            .catch(err => {
+                pendingFrameWrites--;
+                console.error('Frame write error:', err);
+            });
+        
+        return { success: true, frameNumber };
+    } catch (error) {
+        console.error('Failed to capture frame buffer:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // Capture the current webview/window frame
 ipcMain.handle('capture-webview-frame', async (event, webContentsId) => {
     try {

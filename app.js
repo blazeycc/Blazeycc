@@ -504,19 +504,24 @@ async function startRecording() {
                 .then(async image => {
                     if (!state.canvasRecordingActive) return;
                     
-                    const frameData = image.toDataURL();
+                    // Get raw PNG buffer to avoid base64 corruption
+                    const pngBuffer = image.toPNG();
                     
-                    // Merge annotations if any
-                    let finalFrame = frameData;
+                    // Merge annotations if any (needs data URL for canvas)
+                    let finalBuffer = pngBuffer;
                     if (state.annotationEnabled && state.annotationHistory.length > 0) {
-                        finalFrame = await mergeAnnotationsWithFrame(frameData);
+                        const frameData = image.toDataURL();
+                        const mergedData = await mergeAnnotationsWithFrame(frameData);
+                        // Convert merged data URL back to buffer
+                        const base64Data = mergedData.replace(/^data:image\/png;base64,/, '');
+                        finalBuffer = Buffer.from(base64Data, 'base64');
                     }
                     
-                    return window.electronAPI.captureFrame(finalFrame);
+                    return window.electronAPI.captureFrameBuffer(finalBuffer);
                 })
                 .then(result => {
                     if (result && !result.success) {
-                        console.error('captureFrame failed:', result.error);
+                        console.error('captureFrameBuffer failed:', result.error);
                     }
                 })
                 .catch(err => {
