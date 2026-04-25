@@ -266,8 +266,18 @@
                     <details class="gpu-help" id="gpuHelp" style="display: none;">
                         <summary>How to install FFmpeg for GPU encoding</summary>
                         <div class="gpu-help-content">
-                            <p><strong>Linux (Ubuntu/Debian):</strong></p>
+                            <p><strong>Ubuntu / Debian / Linux Mint / Pop!_OS:</strong></p>
                             <code>sudo apt update && sudo apt install ffmpeg</code>
+                            <p><strong>Fedora / RHEL / CentOS / Rocky:</strong></p>
+                            <code>sudo dnf install ffmpeg</code>
+                            <p><strong>Arch / Manjaro / EndeavourOS:</strong></p>
+                            <code>sudo pacman -S ffmpeg</code>
+                            <p><strong>openSUSE:</strong></p>
+                            <code>sudo zypper install ffmpeg</code>
+                            <p><strong>Solus:</strong></p>
+                            <code>sudo eopkg install ffmpeg</code>
+                            <p><strong>Void Linux:</strong></p>
+                            <code>sudo xbps-install -S ffmpeg</code>
                             <p><strong>Windows:</strong></p>
                             <code>choco install ffmpeg</code>
                             <p>Or download from <a href="#" onclick="window.electronAPI.openExternal('https://www.gyan.dev/ffmpeg/builds/')">gyan.dev/ffmpeg/builds</a></p>
