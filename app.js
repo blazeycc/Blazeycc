@@ -164,9 +164,7 @@ const state = {
     customWatermarkSettings: { type: 'none', text: '', position: 'bottom-left', imagePath: null },
     // Annotation state
     annotationEnabled: false,
-    annotationTool: 'arrow',
-    annotationHistory: [],
-    annotationRedoStack: [],
+    annotationTool: 'select',
     // Zoom state
     zoomLevel: 0,
     // Ollama config
@@ -1856,28 +1854,36 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =====================
-// ANNOTATION FUNCTIONS (Pro+)
+// ANNOTATION FUNCTIONS (Fabric.js)
 // =====================
 
-let annotationCtx = null;
-let isDrawing = false;
-let startX = 0, startY = 0;
+let fabricCanvas = null;
+let annotationStates = [];
+let currentStateIndex = -1;
 
 function initAnnotations() {
     const canvas = elements.annotationCanvas;
     const toolbar = elements.annotationToolbar;
     
     if (!canvas || !toolbar) return;
+    if (typeof fabric === 'undefined') {
+        console.warn('Fabric.js not loaded');
+        return;
+    }
     
-    annotationCtx = canvas.getContext('2d');
+    // Initialize Fabric canvas
+    fabricCanvas = new fabric.Canvas('annotationCanvas', {
+        isDrawingMode: false,
+        selection: true,
+        defaultCursor: 'default'
+    });
     
-    // Check if Pro+ license
+    // Show toolbar for everyone
     checkAnnotationAccess();
     
     // Setup canvas size when webview loads
     elements.webview?.addEventListener('dom-ready', () => {
         resizeAnnotationCanvas();
-        // Show annotation toolbar for Pro+ users
         checkAnnotationAccess();
     });
     
@@ -1890,10 +1896,14 @@ function initAnnotations() {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.annotation-tool').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                state.annotationTool = btn.dataset.tool;
+                setAnnotationTool(btn.dataset.tool);
             });
         }
     });
+    
+    // Color and size changes
+    elements.annotationColor?.addEventListener('change', updateDrawingBrush);
+    elements.annotationSize?.addEventListener('change', updateDrawingBrush);
     
     // Clear annotations
     elements.clearAnnotationsBtn?.addEventListener('click', clearAnnotations);
@@ -1901,34 +1911,268 @@ function initAnnotations() {
     // Undo
     elements.undoAnnotationBtn?.addEventListener('click', undoAnnotation);
     
-    // Canvas drawing events
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('mouseleave', stopDrawing);
+    // Setup Fabric drawing events
+    setupFabricDrawingEvents();
     
     // Window resize
     window.addEventListener('resize', resizeAnnotationCanvas);
+    
+    // Save initial empty state
+    saveAnnotationState();
 }
 
 async function checkAnnotationAccess() {
-    // All features are free - show annotation toolbar for everyone
     if (elements.annotationToolbar) {
         elements.annotationToolbar.style.display = 'flex';
     }
 }
 
+function setAnnotationTool(tool) {
+    state.annotationTool = tool;
+    
+    if (!fabricCanvas) return;
+    
+    fabricCanvas.isDrawingMode = false;
+    fabricCanvas.selection = false;
+    fabricCanvas.discardActiveObject();
+    fabricCanvas.renderAll();
+    
+    switch(tool) {
+        case 'select':
+            fabricCanvas.selection = true;
+            fabricCanvas.defaultCursor = 'default';
+            break;
+        case 'highlight':
+            fabricCanvas.isDrawingMode = true;
+            updateDrawingBrush();
+            fabricCanvas.defaultCursor = 'crosshair';
+            break;
+        case 'arrow':
+        case 'rectangle':
+        case 'circle':
+        case 'text':
+            fabricCanvas.defaultCursor = 'crosshair';
+            break;
+    }
+}
+
+function updateDrawingBrush() {
+    if (!fabricCanvas || !fabricCanvas.isDrawingMode) return;
+    
+    const color = elements.annotationColor?.value || '#ff0000';
+    const size = parseInt(elements.annotationSize?.value || '4');
+    
+    const brush = new fabric.PencilBrush(fabricCanvas);
+    brush.color = color;
+    brush.width = size * 3;
+    fabricCanvas.freeDrawingBrush = brush;
+}
+
+function setupFabricDrawingEvents() {
+    if (!fabricCanvas) return;
+    
+    let isDrawing = false;
+    let startPoint = null;
+    let currentShape = null;
+    
+    fabricCanvas.on('mouse:down', (e) => {
+        if (fabricCanvas.isDrawingMode || state.annotationTool === 'select') return;
+        if (e.target) return; // Don't draw on existing objects
+        
+        isDrawing = true;
+        const pointer = fabricCanvas.getPointer(e.e);
+        startPoint = pointer;
+        
+        const color = elements.annotationColor?.value || '#ff0000';
+        const size = parseInt(elements.annotationSize?.value || '4');
+        
+        switch(state.annotationTool) {
+            case 'rectangle':
+                currentShape = new fabric.Rect({
+                    left: pointer.x,
+                    top: pointer.y,
+                    width: 0,
+                    height: 0,
+                    fill: 'transparent',
+                    stroke: color,
+                    strokeWidth: size,
+                    selectable: false,
+                    evented: false
+                });
+                fabricCanvas.add(currentShape);
+                break;
+            case 'circle':
+                currentShape = new fabric.Ellipse({
+                    left: pointer.x,
+                    top: pointer.y,
+                    rx: 0,
+                    ry: 0,
+                    fill: 'transparent',
+                    stroke: color,
+                    strokeWidth: size,
+                    selectable: false,
+                    evented: false
+                });
+                fabricCanvas.add(currentShape);
+                break;
+            case 'arrow':
+                currentShape = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+                    stroke: color,
+                    strokeWidth: size,
+                    selectable: false,
+                    evented: false
+                });
+                fabricCanvas.add(currentShape);
+                break;
+            case 'text':
+                isDrawing = false;
+                const textbox = new fabric.Textbox('Double-click to edit', {
+                    left: pointer.x,
+                    top: pointer.y,
+                    fontSize: size * 5,
+                    fill: color,
+                    width: 150,
+                    editable: true
+                });
+                fabricCanvas.add(textbox);
+                fabricCanvas.setActiveObject(textbox);
+                textbox.enterEditing();
+                saveAnnotationState();
+                break;
+        }
+    });
+    
+    fabricCanvas.on('mouse:move', (e) => {
+        if (!isDrawing || !currentShape) return;
+        const pointer = fabricCanvas.getPointer(e.e);
+        
+        switch(state.annotationTool) {
+            case 'rectangle':
+                currentShape.set({
+                    width: Math.abs(pointer.x - startPoint.x),
+                    height: Math.abs(pointer.y - startPoint.y),
+                    left: Math.min(pointer.x, startPoint.x),
+                    top: Math.min(pointer.y, startPoint.y)
+                });
+                break;
+            case 'circle':
+                currentShape.set({
+                    rx: Math.abs(pointer.x - startPoint.x) / 2,
+                    ry: Math.abs(pointer.y - startPoint.y) / 2,
+                    left: Math.min(pointer.x, startPoint.x) + Math.abs(pointer.x - startPoint.x) / 2,
+                    top: Math.min(pointer.y, startPoint.y) + Math.abs(pointer.y - startPoint.y) / 2,
+                    originX: 'center',
+                    originY: 'center'
+                });
+                break;
+            case 'arrow': {
+                const x1 = startPoint.x;
+                const y1 = startPoint.y;
+                const x2 = pointer.x;
+                const y2 = pointer.y;
+                currentShape.set({ x1, y1, x2, y2 });
+                break;
+            }
+        }
+        fabricCanvas.renderAll();
+    });
+    
+    fabricCanvas.on('mouse:up', () => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        
+        if (currentShape) {
+            currentShape.set({ selectable: true, evented: true });
+            
+            // For arrow, add arrowhead
+            if (state.annotationTool === 'arrow') {
+                addArrowhead(currentShape);
+            }
+            
+            currentShape = null;
+            saveAnnotationState();
+        }
+    });
+    
+    // Save state after object modifications
+    fabricCanvas.on('object:modified', () => {
+        saveAnnotationState();
+    });
+}
+
+function addArrowhead(line) {
+    const x1 = line.x1;
+    const y1 = line.y1;
+    const x2 = line.x2;
+    const y2 = line.y2;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLen = line.strokeWidth * 4;
+    const color = line.stroke;
+    
+    const head = new fabric.Triangle({
+        left: x2,
+        top: y2,
+        originX: 'center',
+        originY: 'center',
+        angle: fabric.util.radiansToDegrees(angle) + 90,
+        width: headLen,
+        height: headLen,
+        fill: color,
+        selectable: false
+    });
+    
+    // Group line and head
+    const group = new fabric.Group([line, head], {
+        selectable: true
+    });
+    
+    fabricCanvas.remove(line);
+    fabricCanvas.add(group);
+    fabricCanvas.renderAll();
+}
+
+function saveAnnotationState() {
+    if (!fabricCanvas) return;
+    const json = fabricCanvas.toJSON();
+    annotationStates = annotationStates.slice(0, currentStateIndex + 1);
+    annotationStates.push(json);
+    currentStateIndex++;
+    if (annotationStates.length > 50) {
+        annotationStates.shift();
+        currentStateIndex--;
+    }
+}
+
+function undoAnnotation() {
+    if (currentStateIndex > 0) {
+        currentStateIndex--;
+        fabricCanvas.loadFromJSON(annotationStates[currentStateIndex], () => {
+            fabricCanvas.renderAll();
+        });
+    } else if (currentStateIndex === 0) {
+        fabricCanvas.clear();
+        annotationStates = [];
+        currentStateIndex = -1;
+        saveAnnotationState();
+    }
+}
+
+function clearAnnotations() {
+    if (!fabricCanvas) return;
+    fabricCanvas.clear();
+    annotationStates = [];
+    currentStateIndex = -1;
+    saveAnnotationState();
+}
+
 function resizeAnnotationCanvas() {
     const container = document.getElementById('browserContainer');
-    const canvas = elements.annotationCanvas;
+    if (!container || !fabricCanvas) return;
     
-    if (!container || !canvas) return;
-    
-    canvas.width = container.offsetWidth;
-    canvas.height = container.offsetHeight;
-    
-    // Redraw existing annotations
-    redrawAnnotations();
+    fabricCanvas.setWidth(container.offsetWidth);
+    fabricCanvas.setHeight(container.offsetHeight);
+    fabricCanvas.calcOffset();
+    fabricCanvas.renderAll();
 }
 
 function toggleAnnotationMode() {
@@ -1941,209 +2185,25 @@ function toggleAnnotationMode() {
         canvas.classList.add('active');
         tools.style.display = 'flex';
         elements.annotateToggleBtn?.classList.add('active');
-        showNotification('Annotation mode enabled - draw on the screen', 'info');
+        resizeAnnotationCanvas();
+        setAnnotationTool(state.annotationTool || 'select');
+        showNotification('Annotation mode enabled — click and drag to draw', 'info');
     } else {
         canvas.classList.remove('active');
         tools.style.display = 'none';
         elements.annotateToggleBtn?.classList.remove('active');
-    }
-}
-
-function startDrawing(e) {
-    if (!state.annotationEnabled) return;
-    
-    isDrawing = true;
-    const rect = elements.annotationCanvas.getBoundingClientRect();
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
-    
-    if (state.annotationTool === 'text') {
-        isDrawing = false;
-        showTextInput(startX, startY);
-    }
-}
-
-function draw(e) {
-    if (!isDrawing || !state.annotationEnabled) return;
-    
-    const canvas = elements.annotationCanvas;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // For highlight, draw continuously
-    if (state.annotationTool === 'highlight') {
-        const color = elements.annotationColor?.value || '#ff0000';
-        const size = parseInt(elements.annotationSize?.value || '4');
-        
-        annotationCtx.globalAlpha = 0.3;
-        annotationCtx.strokeStyle = color;
-        annotationCtx.lineWidth = size * 3;
-        annotationCtx.lineCap = 'round';
-        annotationCtx.beginPath();
-        annotationCtx.moveTo(startX, startY);
-        annotationCtx.lineTo(x, y);
-        annotationCtx.stroke();
-        annotationCtx.globalAlpha = 1;
-        
-        startX = x;
-        startY = y;
-    }
-}
-
-function stopDrawing(e) {
-    if (!isDrawing || !state.annotationEnabled) return;
-    isDrawing = false;
-    
-    const canvas = elements.annotationCanvas;
-    const rect = canvas.getBoundingClientRect();
-    const endX = e.clientX - rect.left;
-    const endY = e.clientY - rect.top;
-    
-    const color = elements.annotationColor?.value || '#ff0000';
-    const size = parseInt(elements.annotationSize?.value || '4');
-    
-    // Save annotation to history
-    const annotation = {
-        tool: state.annotationTool,
-        startX, startY, endX, endY,
-        color, size
-    };
-    
-    state.annotationHistory.push(annotation);
-    state.annotationRedoStack = [];
-    
-    // Draw the shape
-    drawShape(annotation);
-}
-
-function drawShape(ann) {
-    annotationCtx.strokeStyle = ann.color;
-    annotationCtx.fillStyle = ann.color;
-    annotationCtx.lineWidth = ann.size;
-    annotationCtx.lineCap = 'round';
-    annotationCtx.lineJoin = 'round';
-    
-    switch (ann.tool) {
-        case 'arrow':
-            drawArrow(ann.startX, ann.startY, ann.endX, ann.endY, ann.size);
-            break;
-        case 'rectangle':
-            annotationCtx.strokeRect(
-                ann.startX, ann.startY,
-                ann.endX - ann.startX, ann.endY - ann.startY
-            );
-            break;
-        case 'circle':
-            const radiusX = Math.abs(ann.endX - ann.startX) / 2;
-            const radiusY = Math.abs(ann.endY - ann.startY) / 2;
-            const centerX = ann.startX + (ann.endX - ann.startX) / 2;
-            const centerY = ann.startY + (ann.endY - ann.startY) / 2;
-            annotationCtx.beginPath();
-            annotationCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
-            annotationCtx.stroke();
-            break;
-        case 'text':
-            if (ann.text) {
-                annotationCtx.font = `${ann.size * 4}px sans-serif`;
-                annotationCtx.fillText(ann.text, ann.startX, ann.startY);
-            }
-            break;
-    }
-}
-
-function drawArrow(fromX, fromY, toX, toY, size) {
-    const headLength = size * 4;
-    const angle = Math.atan2(toY - fromY, toX - fromX);
-    
-    // Line
-    annotationCtx.beginPath();
-    annotationCtx.moveTo(fromX, fromY);
-    annotationCtx.lineTo(toX, toY);
-    annotationCtx.stroke();
-    
-    // Arrowhead
-    annotationCtx.beginPath();
-    annotationCtx.moveTo(toX, toY);
-    annotationCtx.lineTo(
-        toX - headLength * Math.cos(angle - Math.PI / 6),
-        toY - headLength * Math.sin(angle - Math.PI / 6)
-    );
-    annotationCtx.lineTo(
-        toX - headLength * Math.cos(angle + Math.PI / 6),
-        toY - headLength * Math.sin(angle + Math.PI / 6)
-    );
-    annotationCtx.closePath();
-    annotationCtx.fill();
-}
-
-function showTextInput(x, y) {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'annotation-text-input';
-    input.style.left = x + 'px';
-    input.style.top = y + 'px';
-    
-    const container = document.getElementById('browserContainer');
-    container.appendChild(input);
-    input.focus();
-    
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && input.value) {
-            const annotation = {
-                tool: 'text',
-                startX: x, startY: y + 20,
-                endX: x, endY: y,
-                color: elements.annotationColor?.value || '#ff0000',
-                size: parseInt(elements.annotationSize?.value || '4'),
-                text: input.value
-            };
-            state.annotationHistory.push(annotation);
-            drawShape(annotation);
-            input.remove();
-        } else if (e.key === 'Escape') {
-            input.remove();
+        if (fabricCanvas) {
+            fabricCanvas.discardActiveObject();
+            fabricCanvas.renderAll();
         }
-    });
-    
-    input.addEventListener('blur', () => input.remove());
+    }
 }
 
-function clearAnnotations() {
-    const canvas = elements.annotationCanvas;
-    annotationCtx.clearRect(0, 0, canvas.width, canvas.height);
-    state.annotationHistory = [];
-    state.annotationRedoStack = [];
-}
-
-function undoAnnotation() {
-    if (state.annotationHistory.length === 0) return;
-    
-    const last = state.annotationHistory.pop();
-    state.annotationRedoStack.push(last);
-    redrawAnnotations();
-}
-
-function redrawAnnotations() {
-    const canvas = elements.annotationCanvas;
-    annotationCtx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    state.annotationHistory.forEach(ann => {
-        if (ann.tool === 'highlight') {
-            annotationCtx.globalAlpha = 0.3;
-        }
-        drawShape(ann);
-        annotationCtx.globalAlpha = 1;
-    });
-}
-
-// Get annotation canvas data for merging with recording
 function getAnnotationImageData() {
-    if (!elements.annotationCanvas) return null;
-    return elements.annotationCanvas.toDataURL('image/png');
+    if (!fabricCanvas) return null;
+    return fabricCanvas.toDataURL({ format: 'png', multiplier: 1 });
 }
 
-// Merge annotations with a video frame
 async function mergeAnnotationsWithFrame(frameData) {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -2154,23 +2214,22 @@ async function mergeAnnotationsWithFrame(frameData) {
             canvas.width = frameImg.width;
             canvas.height = frameImg.height;
             
-            // Draw the original frame
             ctx.drawImage(frameImg, 0, 0);
             
-            // Draw annotations on top
-            const annotationCanvas = elements.annotationCanvas;
-            if (annotationCanvas) {
-                // Scale annotations to match frame size
-                ctx.drawImage(
-                    annotationCanvas, 
-                    0, 0, annotationCanvas.width, annotationCanvas.height,
-                    0, 0, canvas.width, canvas.height
-                );
+            const annotationData = getAnnotationImageData();
+            if (annotationData) {
+                const annImg = new Image();
+                annImg.onload = () => {
+                    ctx.drawImage(annImg, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                annImg.onerror = () => resolve(frameData);
+                annImg.src = annotationData;
+            } else {
+                resolve(frameData);
             }
-            
-            resolve(canvas.toDataURL('image/png'));
         };
-        frameImg.onerror = () => resolve(frameData); // Fall back to original
+        frameImg.onerror = () => resolve(frameData);
         frameImg.src = frameData;
     });
 }

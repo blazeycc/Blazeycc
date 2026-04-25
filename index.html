@@ -210,11 +210,12 @@
                 </div>
                 <span id="currentUrl" class="current-url"></span>
             </div>
-            <!-- Annotation Toolbar (Pro+) -->
+            <!-- Annotation Toolbar -->
             <div class="annotation-toolbar" id="annotationToolbar" style="display: none;">
                 <button id="annotateToggleBtn" class="btn btn-small annotation-tool" data-tool="toggle" title="Toggle Annotations">✏️ Annotate</button>
                 <div class="annotation-tools" id="annotationTools" style="display: none;">
-                    <button class="btn btn-small annotation-tool active" data-tool="arrow" title="Arrow">➤</button>
+                    <button class="btn btn-small annotation-tool active" data-tool="select" title="Select / Move">↖</button>
+                    <button class="btn btn-small annotation-tool" data-tool="arrow" title="Arrow">➤</button>
                     <button class="btn btn-small annotation-tool" data-tool="rectangle" title="Rectangle">▢</button>
                     <button class="btn btn-small annotation-tool" data-tool="circle" title="Circle">○</button>
                     <button class="btn btn-small annotation-tool" data-tool="highlight" title="Highlight">🖌️</button>
@@ -396,6 +397,7 @@
         <div class="notifications" id="notifications"></div>
     </div>
 
+    <script src="node_modules/fabric/dist/index.min.js"></script>
     <script src="app.js"></script>
     <script>
         // Direct fallback for browse button
