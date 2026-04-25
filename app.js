@@ -239,6 +239,7 @@ async function init() {
             elements.formatPreset.value = preset;
             elements.outputFormat.value = format;
             resizeBrowserViewport(preset);
+            resizeAnnotationCanvas();
             updateSettingsInfo();
             showNotification(`Set to ${btn.textContent.trim()} preset`, 'info');
         });
@@ -301,6 +302,7 @@ async function init() {
     elements.outputFormat.addEventListener('change', updateSettingsInfo);
     elements.formatPreset.addEventListener('change', () => {
         resizeBrowserViewport(elements.formatPreset.value);
+        resizeAnnotationCanvas();
         updateSettingsInfo();
     });
     elements.qualitySetting.addEventListener('change', updateSettingsInfo);
@@ -357,10 +359,12 @@ async function init() {
 
     // Apply initial viewport size for the default preset
     resizeBrowserViewport(elements.formatPreset.value);
+    resizeAnnotationCanvas();
     
     // Re-calculate viewport on window resize
     window.addEventListener('resize', () => {
         resizeBrowserViewport(elements.formatPreset.value);
+        resizeAnnotationCanvas();
     });
     
     // Keyboard shortcuts for zoom (Ctrl/Cmd + +/- and Ctrl/Cmd + 0)
@@ -553,8 +557,13 @@ async function startRecording() {
         state.droppedFrames = 0;
         
         // Get webview's WebContents ID for main-process capture
-        // Note: getWebContents() is deprecated in newer Electron; main process will fall back to mainWindow capture
         let webviewWebContentsId = null;
+        try {
+            webviewWebContentsId = elements.webview.getWebContentsId();
+            console.log('Webview webContents ID:', webviewWebContentsId);
+        } catch (e) {
+            console.warn('Could not get webview webContentsId:', e);
+        }
         
         state.frameCaptureInterval = setInterval(() => {
             if (!state.canvasRecordingActive) return;
@@ -572,7 +581,7 @@ async function startRecording() {
                     if (frameResult.success && state.canvasRecordingActive) {
                         // Merge annotations if any
                         let frameData = frameResult.data;
-                        if (state.annotationEnabled && state.annotationHistory.length > 0) {
+                        if (state.annotationEnabled && fabricCanvas && fabricCanvas.getObjects().length > 0) {
                             frameData = await mergeAnnotationsWithFrame(frameResult.data);
                         }
                         return window.electronAPI.captureFrame(frameData);
