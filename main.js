@@ -136,6 +136,21 @@ function getWatermarkPosition(position) {
 function getFFmpegPath() {
     let ffmpegPath;
     
+    // Check for system-installed FFmpeg first (may have GPU encoders like NVENC)
+    const systemPaths = [
+        '/usr/bin/ffmpeg',
+        '/usr/local/bin/ffmpeg',
+        '/opt/homebrew/bin/ffmpeg',
+        'C:\\ffmpeg\\bin\\ffmpeg.exe'
+    ];
+    
+    for (const sysPath of systemPaths) {
+        if (fs.existsSync(sysPath)) {
+            console.log('Using system FFmpeg:', sysPath);
+            return sysPath;
+        }
+    }
+    
     // When packaged, check extraResources first
     if (app.isPackaged) {
         const extraResourcesPath = path.join(process.resourcesPath, 'ffmpeg');

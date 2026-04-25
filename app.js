@@ -1236,7 +1236,7 @@ async function loadGpuEncoding() {
         } else {
             elements.gpuEncodingToggle.disabled = true;
             elements.gpuEncodingToggle.checked = false;
-            elements.gpuEncoderInfo.textContent = 'No GPU encoder detected (CPU encoding only)';
+            elements.gpuEncoderInfo.textContent = 'Install system FFmpeg for GPU encoding (bundled FFmpeg has no GPU support)';
         }
     } catch (e) {
         console.log('GPU detection failed:', e);
