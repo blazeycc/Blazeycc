@@ -1345,6 +1345,59 @@ html[data-theme="light"] body {
     color: var(--text-muted);
 }
 
+.ollama-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.ollama-config {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.ollama-config label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.ollama-config input {
+    width: 100%;
+    padding: 0.6rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.ollama-config input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.ollama-config .btn {
+    align-self: flex-start;
+    margin-top: 0.25rem;
+}
+
+.ollama-help {
+    margin-top: 0.5rem;
+}
+
+.ollama-help summary {
+    color: var(--accent-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+}
+
 /* =====================
    ANNOTATION STYLES
    ===================== */
