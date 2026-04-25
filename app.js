@@ -1233,16 +1233,19 @@ async function loadGpuEncoding() {
             elements.gpuEncoderInfo.textContent = `Detected: ${gpuInfo.name}`;
             const enabled = await window.electronAPI.getGpuEncoding();
             elements.gpuEncodingToggle.checked = enabled;
+            document.getElementById('gpuHelp').style.display = 'none';
         } else {
             elements.gpuEncodingToggle.disabled = true;
             elements.gpuEncodingToggle.checked = false;
             elements.gpuEncoderInfo.textContent = 'Install system FFmpeg for GPU encoding (bundled FFmpeg has no GPU support)';
+            document.getElementById('gpuHelp').style.display = 'block';
         }
     } catch (e) {
         console.log('GPU detection failed:', e);
         elements.gpuEncodingToggle.disabled = true;
         elements.gpuEncodingToggle.checked = false;
         elements.gpuEncoderInfo.textContent = 'GPU detection failed (CPU encoding only)';
+        document.getElementById('gpuHelp').style.display = 'block';
     }
     
     // Add event listener

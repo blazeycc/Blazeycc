@@ -263,7 +263,19 @@
                         Use GPU Encoding (faster exports)
                     </label>
                     <p class="help-text" id="gpuEncoderInfo">Detecting GPU...</p>
-                    <p class="help-text">Requires system FFmpeg with NVENC/AMF/QSV. Install ffmpeg for GPU support.</p>
+                    <details class="gpu-help" id="gpuHelp" style="display: none;">
+                        <summary>How to install FFmpeg for GPU encoding</summary>
+                        <div class="gpu-help-content">
+                            <p><strong>Linux (Ubuntu/Debian):</strong></p>
+                            <code>sudo apt update && sudo apt install ffmpeg</code>
+                            <p><strong>Windows:</strong></p>
+                            <code>choco install ffmpeg</code>
+                            <p>Or download from <a href="#" onclick="window.electronAPI.openExternal('https://www.gyan.dev/ffmpeg/builds/')">gyan.dev/ffmpeg/builds</a></p>
+                            <p><strong>macOS:</strong></p>
+                            <code>brew install ffmpeg</code>
+                            <p class="help-text">Restart Blazeycc after installing.</p>
+                        </div>
+                    </details>
                 </div>
             </div>
         </section>
