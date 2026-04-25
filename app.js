@@ -83,6 +83,9 @@ const elements = {
     progressModal: document.getElementById('progressModal'),
     progressBar: document.getElementById('progressBar'),
     progressText: document.getElementById('progressText'),
+    // Trim controls
+    trimStart: document.getElementById('trimStart'),
+    trimEnd: document.getElementById('trimEnd'),
     // Annotation elements
     annotationToolbar: document.getElementById('annotationToolbar'),
     annotationTools: document.getElementById('annotationTools'),
@@ -649,6 +652,12 @@ async function stopRecording() {
             const settings = getExportSettings();
             settings.proSettings = settings.proSettings || {};
             settings.proSettings.audioPath = audioPath;
+            
+            // Add trim values if set
+            const trimStart = parseFloat(elements.trimStart?.value) || 0;
+            const trimEnd = parseFloat(elements.trimEnd?.value) || 0;
+            if (trimStart > 0) settings.proSettings.trimStart = trimStart;
+            if (trimEnd > 0) settings.proSettings.trimEnd = trimEnd;
             
             const result = await window.electronAPI.stopCanvasRecording(
                 settings.format,

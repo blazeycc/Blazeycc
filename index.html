@@ -175,6 +175,14 @@
                         <input type="number" id="customHeight" placeholder="Height" value="1080" min="240" max="2160">
                     </div>
                 </div>
+                <div class="setting-group">
+                    <label>Trim Start</label>
+                    <input type="number" id="trimStart" value="0" min="0" step="0.5" placeholder="sec" style="width:80px;">
+                </div>
+                <div class="setting-group">
+                    <label>Trim End</label>
+                    <input type="number" id="trimEnd" value="0" min="0" step="0.5" placeholder="sec" style="width:80px;">
+                </div>
             </div>
             <div class="settings-info" id="settingsInfo">
                 Output: MP4 • 1920×1080 • High Quality
@@ -369,6 +377,18 @@
                 </div>
                 <div class="preview-video-container">
                     <video id="previewVideo" controls></video>
+                </div>
+                <div class="preview-trim-controls">
+                    <div class="trim-group">
+                        <label>Trim Start</label>
+                        <input type="number" id="trimStart" value="0" min="0" step="0.1" placeholder="sec">
+                        <span>s</span>
+                    </div>
+                    <div class="trim-group">
+                        <label>Trim End</label>
+                        <input type="number" id="trimEnd" value="0" min="0" step="0.1" placeholder="sec">
+                        <span>s</span>
+                    </div>
                 </div>
                 <div class="preview-actions">
                     <button id="discardBtn" class="btn btn-danger">🗑️ Discard</button>

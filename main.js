@@ -1136,9 +1136,19 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
                 .inputFPS(actualFps)
                 .fps(30);
             
+            // Apply trim if specified
+            const trimStart = settings.trimStart || 0;
+            const trimEnd = settings.trimEnd || 0;
+            if (trimStart > 0) {
+                command = command.seekInput(trimStart);
+            }
+            
             // Add audio input if available
             if (hasAudio) {
                 command = command.input(audioPath);
+                if (trimStart > 0) {
+                    command = command.inputOptions(`-ss ${trimStart}`);
+                }
             }
             
             // Add watermark input if needed
@@ -1291,6 +1301,14 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
                     .fps(15)
                     .outputOptions(['-loop', '0']);
                 // GIF doesn't support audio or GPU encoding
+            }
+            
+            // Apply trim end/duration
+            if (trimEnd > 0) {
+                const totalDuration = duration - trimStart - trimEnd;
+                if (totalDuration > 0) {
+                    command = command.duration(totalDuration);
+                }
             }
             
             command

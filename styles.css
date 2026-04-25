@@ -1147,6 +1147,43 @@ html[data-theme="light"] body {
     max-height: 60vh;
 }
 
+.preview-trim-controls {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-input);
+    border-radius: 8px;
+}
+
+.trim-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.trim-group label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.trim-group input {
+    width: 60px;
+    padding: 0.4rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.trim-group span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 .preview-actions {
     display: flex;
     justify-content: flex-end;

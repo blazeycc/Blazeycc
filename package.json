@@ -1,6 +1,6 @@
 {
   "name": "blazeycc",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Record any website as video",
   "main": "main.js",
   "scripts": {
