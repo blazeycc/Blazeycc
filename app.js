@@ -489,6 +489,16 @@ async function startRecording() {
         state.frameCapturePending = false;
         state.droppedFrames = 0;
         
+        // Get webview's WebContents ID for main-process capture (more reliable)
+        let webviewWebContentsId = null;
+        try {
+            const webviewWC = await elements.webview.getWebContents();
+            webviewWebContentsId = webviewWC.id;
+            console.log('Webview webContents ID:', webviewWebContentsId);
+        } catch (e) {
+            console.warn('Could not get webview webContents:', e);
+        }
+        
         state.frameCaptureInterval = setInterval(() => {
             if (!state.canvasRecordingActive) return;
             if (state.frameCapturePending) {
@@ -499,29 +509,16 @@ async function startRecording() {
             
             state.frameCapturePending = true;
             
-            // Capture directly from webview element (renders actual website content)
-            elements.webview.capturePage()
-                .then(async image => {
-                    if (!state.canvasRecordingActive) return;
-                    
-                    // Get raw PNG buffer to avoid base64 corruption
-                    const pngBuffer = image.toPNG();
-                    
-                    // Merge annotations if any (needs data URL for canvas)
-                    let finalBuffer = pngBuffer;
-                    if (state.annotationEnabled && state.annotationHistory.length > 0) {
-                        const frameData = image.toDataURL();
-                        const mergedData = await mergeAnnotationsWithFrame(frameData);
-                        // Convert merged data URL back to buffer
-                        const base64Data = mergedData.replace(/^data:image\/png;base64,/, '');
-                        finalBuffer = Buffer.from(base64Data, 'base64');
-                    }
-                    
-                    return window.electronAPI.captureFrameBuffer(finalBuffer);
-                })
-                .then(result => {
-                    if (result && !result.success) {
-                        console.error('captureFrameBuffer failed:', result.error);
+            // Capture via main process using webContents ID (avoids renderer stale frames)
+            window.electronAPI.captureWebviewFrame(webviewWebContentsId)
+                .then(async frameResult => {
+                    if (frameResult.success && state.canvasRecordingActive) {
+                        // Merge annotations if any
+                        let frameData = frameResult.data;
+                        if (state.annotationEnabled && state.annotationHistory.length > 0) {
+                            frameData = await mergeAnnotationsWithFrame(frameResult.data);
+                        }
+                        return window.electronAPI.captureFrame(frameData);
                     }
                 })
                 .catch(err => {
