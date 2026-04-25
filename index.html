@@ -330,6 +330,34 @@
                         </div>
                     </details>
                 </div>
+                <div class="setting-item" id="ollamaSetting">
+                    <label>🧠 AI Assist (Ollama)</label>
+                    <div class="ollama-status-row">
+                        <span id="ollamaStatusIcon">⏳</span>
+                        <span id="ollamaStatusText">Checking Ollama...</span>
+                    </div>
+                    <div class="ollama-config">
+                        <label for="ollamaEndpoint">Endpoint</label>
+                        <input type="text" id="ollamaEndpoint" value="http://localhost:11434" placeholder="http://localhost:11434">
+                        <label for="ollamaModel">Model</label>
+                        <input type="text" id="ollamaModel" value="llama3.2" placeholder="llama3.2">
+                        <button id="testOllamaBtn" class="btn btn-small">🔄 Test Connection</button>
+                    </div>
+                    <details class="ollama-help">
+                        <summary>How to install Ollama</summary>
+                        <div class="gpu-help-content">
+                            <p><strong>Linux:</strong></p>
+                            <code>curl -fsSL https://ollama.com/install.sh | sh</code>
+                            <p><strong>macOS:</strong></p>
+                            <code>brew install ollama</code>
+                            <p><strong>Windows:</strong></p>
+                            <code>Download from ollama.com/download</code>
+                            <p class="help-text">Then download a model:</p>
+                            <code>ollama pull llama3.2</code>
+                            <p class="help-text">Restart Blazeycc after installing.</p>
+                        </div>
+                    </details>
+                </div>
             </div>
         </section>
 

@@ -61,6 +61,12 @@ const elements = {
     gpuEncodingToggle: document.getElementById('gpuEncodingToggle'),
     gpuEncoderInfo: document.getElementById('gpuEncoderInfo'),
     frameRateSelect: document.getElementById('frameRateSelect'),
+    // Ollama settings
+    ollamaStatusIcon: document.getElementById('ollamaStatusIcon'),
+    ollamaStatusText: document.getElementById('ollamaStatusText'),
+    ollamaEndpoint: document.getElementById('ollamaEndpoint'),
+    ollamaModel: document.getElementById('ollamaModel'),
+    testOllamaBtn: document.getElementById('testOllamaBtn'),
     // New elements
     themeToggleBtn: document.getElementById('themeToggleBtn'),
     autoScrollToggle: document.getElementById('autoScrollToggle'),
@@ -162,7 +168,9 @@ const state = {
     annotationHistory: [],
     annotationRedoStack: [],
     // Zoom state
-    zoomLevel: 0
+    zoomLevel: 0,
+    // Ollama config
+    ollamaConfig: { endpoint: 'http://localhost:11434', model: 'llama3.2' }
 };
 
 // Initialize
@@ -327,6 +335,11 @@ async function init() {
         });
     });
     
+    // Ollama settings
+    elements.testOllamaBtn?.addEventListener('click', testOllamaConnection);
+    elements.ollamaEndpoint?.addEventListener('change', saveOllamaConfig);
+    elements.ollamaModel?.addEventListener('change', saveOllamaConfig);
+    
     // Settings panel
     elements.settingsBtn.addEventListener('click', toggleSettingsPanel);
     elements.closeSettingsBtn.addEventListener('click', () => elements.settingsPanel.style.display = 'none');
@@ -342,6 +355,7 @@ async function init() {
     await loadFrameRate();
     await loadGpuEncoding();
     await loadLicense();
+    await loadOllamaConfig();
 
     // Apply initial viewport size for the default preset
     resizeBrowserViewport(elements.formatPreset.value);
@@ -974,6 +988,82 @@ async function clearHistory() {
 }
 
 // =====================
+// Ollama Config Functions
+// =====================
+
+function getOllamaConfig() {
+    return state.ollamaConfig;
+}
+
+async function loadOllamaConfig() {
+    try {
+        const saved = await window.electronAPI.getOllamaConfig();
+        if (saved) {
+            state.ollamaConfig = { ...state.ollamaConfig, ...saved };
+        }
+    } catch (e) {
+        // No saved config, use defaults
+    }
+    
+    if (elements.ollamaEndpoint) {
+        elements.ollamaEndpoint.value = state.ollamaConfig.endpoint;
+    }
+    if (elements.ollamaModel) {
+        elements.ollamaModel.value = state.ollamaConfig.model;
+    }
+    
+    await checkOllamaStatus();
+}
+
+async function saveOllamaConfig() {
+    state.ollamaConfig.endpoint = elements.ollamaEndpoint?.value?.trim() || 'http://localhost:11434';
+    state.ollamaConfig.model = elements.ollamaModel?.value?.trim() || 'llama3.2';
+    
+    try {
+        await window.electronAPI.setOllamaConfig(state.ollamaConfig);
+    } catch (e) {}
+    
+    await checkOllamaStatus();
+}
+
+async function checkOllamaStatus() {
+    const { endpoint, model } = state.ollamaConfig;
+    
+    if (!elements.ollamaStatusIcon || !elements.ollamaStatusText) return;
+    
+    elements.ollamaStatusIcon.textContent = '⏳';
+    elements.ollamaStatusText.textContent = 'Checking Ollama...';
+    
+    try {
+        const response = await fetch(`${endpoint}/api/tags`, { method: 'GET' });
+        if (!response.ok) {
+            throw new Error('Not running');
+        }
+        
+        const data = await response.json();
+        const models = data.models || [];
+        const hasModel = models.some(m => m.name === model || m.name.startsWith(model + ':'));
+        
+        if (hasModel) {
+            elements.ollamaStatusIcon.textContent = '✅';
+            elements.ollamaStatusText.textContent = `Ollama ready — ${model} installed`;
+        } else {
+            elements.ollamaStatusIcon.textContent = '⚠️';
+            elements.ollamaStatusText.textContent = `Ollama running — run: ollama pull ${model}`;
+        }
+    } catch (error) {
+        elements.ollamaStatusIcon.textContent = '❌';
+        elements.ollamaStatusText.textContent = 'Ollama not running. Install and start it first.';
+    }
+}
+
+async function testOllamaConnection() {
+    await saveOllamaConfig();
+    showNotification('Testing Ollama connection...', 'info');
+    await checkOllamaStatus();
+}
+
+// =====================
 // AI Assist Functions
 // =====================
 
@@ -1011,13 +1101,14 @@ async function generateAiMetadata() {
         `, true);
 
         const prompt = buildAiPrompt(pageData);
-        elements.aiStatus.textContent = 'Generating with Ollama...';
+        const { endpoint, model } = getOllamaConfig();
+        elements.aiStatus.textContent = `Generating with ${model}...`;
 
-        const response = await fetch('http://localhost:11434/api/generate', {
+        const response = await fetch(`${endpoint}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'llama3.2',
+                model: model,
                 prompt: prompt,
                 stream: false,
                 options: {
@@ -1028,7 +1119,7 @@ async function generateAiMetadata() {
         });
 
         if (!response.ok) {
-            throw new Error('Ollama not running. Install Ollama and run: ollama run llama3.2');
+            throw new Error(`Ollama not running at ${endpoint}. Install Ollama and run: ollama pull ${model}`);
         }
 
         const data = await response.json();

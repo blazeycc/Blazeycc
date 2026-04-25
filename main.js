@@ -753,6 +753,16 @@ ipcMain.handle('set-fast-encode', async (event, enabled) => {
     return enabled;
 });
 
+// Ollama config
+ipcMain.handle('get-ollama-config', async () => {
+    return store.get('ollamaConfig', { endpoint: 'http://localhost:11434', model: 'llama3.2' });
+});
+
+ipcMain.handle('set-ollama-config', async (event, config) => {
+    store.set('ollamaConfig', config);
+    return config;
+});
+
 // Open external URL
 ipcMain.handle('open-external', async (event, url) => {
     shell.openExternal(url);

@@ -127,5 +127,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startAudioCapture: () => ipcRenderer.invoke('start-audio-capture'),
     saveAudioChunk: (chunkData) => ipcRenderer.invoke('save-audio-chunk', chunkData),
     stopAudioCapture: () => ipcRenderer.invoke('stop-audio-capture'),
-    cancelAudioCapture: () => ipcRenderer.invoke('cancel-audio-capture')
+    cancelAudioCapture: () => ipcRenderer.invoke('cancel-audio-capture'),
+    
+    // Ollama config
+    getOllamaConfig: () => ipcRenderer.invoke('get-ollama-config'),
+    setOllamaConfig: (config) => ipcRenderer.invoke('set-ollama-config', config)
 });
