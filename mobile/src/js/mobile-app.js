@@ -1,7 +1,8 @@
 // Blazeycc Mobile — Full-Featured Android App
-// Uses Capacitor native screen recording + canvas annotations + AI via Ollama
+// Uses Capacitor native screen recording + canvas annotations + AI via LocalLlm (on-device) or Ollama (remote)
 
 import { ScreenRecorder } from '@blazeycc/screen-recorder';
+import { LocalLlm } from '@blazeycc/local-llm';
 import { Share } from '@capacitor/share';
 import { Toast } from '@capacitor/toast';
 
@@ -36,6 +37,9 @@ const state = {
     scheduledRecordings: [],
     theme: 'dark',
     ollamaConfig: { endpoint: 'http://localhost:11434', model: 'qwen2.5:4b' },
+    aiBackend: 'local', // 'local' or 'remote'
+    localModelLoaded: false,
+    localModelPath: '',
     batchQueue: [],
     batchRecordingInProgress: false,
     batchCurrentIndex: 0
@@ -112,6 +116,18 @@ const elements = {
     aiTitle: document.getElementById('aiTitle'),
     aiDescription: document.getElementById('aiDescription'),
     aiHashtags: document.getElementById('aiHashtags'),
+    aiBackend: document.getElementById('aiBackend'),
+    modelSelect: document.getElementById('modelSelect'),
+    modelStatus: document.getElementById('modelStatus'),
+    downloadModelBtn: document.getElementById('downloadModelBtn'),
+    downloadProgress: document.getElementById('downloadProgress'),
+    downloadProgressBar: document.getElementById('downloadProgressBar'),
+    downloadProgressText: document.getElementById('downloadProgressText'),
+    loadModelBtn: document.getElementById('loadModelBtn'),
+    localModelControls: document.getElementById('localModelControls'),
+    remoteModelControls: document.getElementById('remoteModelControls'),
+    ollamaIp: document.getElementById('ollamaIp'),
+    testOllamaBtn: document.getElementById('testOllamaBtn'),
     bookmarksBar: document.getElementById('bookmarksBar'),
     bookmarksList: document.getElementById('bookmarksList'),
     addBookmarkBtn: document.getElementById('addBookmarkBtn'),
@@ -212,6 +228,18 @@ function init() {
     elements.aiAssistBtn.addEventListener('click', () => togglePanel('ai'));
     elements.closeAiAssistBtn.addEventListener('click', () => togglePanel('ai'));
     elements.generateAiBtn.addEventListener('click', generateAiMetadata);
+
+    // Model Manager
+    elements.aiBackend.addEventListener('change', (e) => {
+        state.aiBackend = e.target.value;
+        elements.localModelControls.style.display = state.aiBackend === 'local' ? 'block' : 'none';
+        elements.remoteModelControls.style.display = state.aiBackend === 'remote' ? 'block' : 'none';
+        updateGenerateButtonState();
+    });
+    elements.downloadModelBtn.addEventListener('click', downloadModel);
+    elements.loadModelBtn.addEventListener('click', loadLocalModel);
+    elements.testOllamaBtn.addEventListener('click', testOllamaConnection);
+    checkLocalModelStatus();
 
     // Bookmarks
     elements.addBookmarkBtn.addEventListener('click', addBookmark);
@@ -847,7 +875,6 @@ async function generateAiMetadata() {
         return;
     }
 
-    elements.aiStatus.textContent = 'Generating with qwen2.5:4b...';
     elements.aiResults.style.display = 'none';
 
     try {
@@ -866,20 +893,37 @@ TITLE: <title>
 DESCRIPTION: <description>
 HASHTAGS: <hashtag1> <hashtag2> <hashtag3> <hashtag4> <hashtag5>`;
 
-        const response = await fetch(`${state.ollamaConfig.endpoint}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: state.ollamaConfig.model,
-                prompt: prompt,
-                stream: false,
-                options: { temperature: 0.7, num_predict: 200 }
-            })
-        });
+        let result;
 
-        if (!response.ok) throw new Error('Ollama not running');
-        const data = await response.json();
-        const result = parseAiResponse(data.response);
+        if (state.aiBackend === 'local') {
+            if (!state.localModelLoaded) {
+                showNotification('Load a model first', 'error');
+                return;
+            }
+            elements.aiStatus.textContent = 'Generating on-device...';
+            const genResult = await LocalLlm.generate({
+                prompt: prompt,
+                maxTokens: 200,
+                temperature: 0.7
+            });
+            result = parseAiResponse(genResult.text);
+        } else {
+            const endpoint = `http://${elements.ollamaIp.value}`;
+            elements.aiStatus.textContent = 'Generating via Ollama...';
+            const response = await fetch(`${endpoint}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'qwen2.5:4b',
+                    prompt: prompt,
+                    stream: false,
+                    options: { temperature: 0.7, num_predict: 200 }
+                })
+            });
+            if (!response.ok) throw new Error('Ollama not running');
+            const data = await response.json();
+            result = parseAiResponse(data.response);
+        }
 
         elements.aiTitle.value = result.title;
         elements.aiDescription.value = result.description;
@@ -1067,6 +1111,116 @@ function togglePanel(name) {
         const visible = elements.aiAssistPanel.style.display !== 'none';
         elements.aiAssistPanel.style.display = visible ? 'none' : 'block';
         elements.historyPanel.style.display = 'none';
+    }
+}
+
+// =====================
+// MODEL MANAGER
+// =====================
+
+async function checkLocalModelStatus() {
+    try {
+        const result = await LocalLlm.getModelPath();
+        const modelsDir = result.path;
+        const filename = elements.modelSelect.value;
+        const modelPath = `${modelsDir}/${filename}`;
+
+        // Check if file exists using Capacitor Filesystem
+        const { Filesystem } = await import('@capacitor/filesystem');
+        try {
+            await Filesystem.stat({ path: `models/${filename}`, directory: 'DATA' });
+            elements.modelStatus.textContent = 'Downloaded';
+            elements.downloadModelBtn.style.display = 'none';
+            elements.loadModelBtn.style.display = 'block';
+        } catch (e) {
+            elements.modelStatus.textContent = 'Not downloaded';
+            elements.downloadModelBtn.style.display = 'block';
+            elements.loadModelBtn.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Check model status failed', e);
+    }
+}
+
+async function downloadModel() {
+    const filename = elements.modelSelect.value;
+    // HuggingFace URL for qwen2.5 GGUF files
+    const baseUrl = 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/';
+    const url = baseUrl + filename;
+
+    elements.downloadModelBtn.disabled = true;
+    elements.downloadProgress.style.display = 'block';
+    elements.modelStatus.textContent = 'Downloading...';
+
+    try {
+        const result = await LocalLlm.downloadModel({ url, filename });
+        if (result.success) {
+            state.localModelPath = result.path;
+            elements.modelStatus.textContent = 'Downloaded';
+            elements.downloadModelBtn.style.display = 'none';
+            elements.loadModelBtn.style.display = 'block';
+            showNotification('Model downloaded!', 'success');
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        elements.modelStatus.textContent = 'Download failed';
+        showNotification('Download failed: ' + error.message, 'error');
+    } finally {
+        elements.downloadModelBtn.disabled = false;
+        elements.downloadProgress.style.display = 'none';
+    }
+}
+
+async function loadLocalModel() {
+    const filename = elements.modelSelect.value;
+    try {
+        const pathResult = await LocalLlm.getModelPath();
+        const modelPath = `${pathResult.path}/${filename}`;
+
+        elements.modelStatus.textContent = 'Loading...';
+        elements.loadModelBtn.disabled = true;
+
+        const result = await LocalLlm.loadModel({ path: modelPath });
+        if (result.success) {
+            state.localModelLoaded = true;
+            state.localModelPath = modelPath;
+            elements.modelStatus.textContent = 'Loaded ✅';
+            showNotification('Model loaded! AI ready.', 'success');
+            updateGenerateButtonState();
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        elements.modelStatus.textContent = 'Load failed';
+        showNotification('Load failed: ' + error.message, 'error');
+    } finally {
+        elements.loadModelBtn.disabled = false;
+    }
+}
+
+async function testOllamaConnection() {
+    const ip = elements.ollamaIp.value;
+    elements.testOllamaBtn.textContent = 'Testing...';
+    try {
+        const response = await fetch(`http://${ip}/api/tags`, { method: 'GET' });
+        if (response.ok) {
+            showNotification('Ollama connected!', 'success');
+        } else {
+            throw new Error('Not responding');
+        }
+    } catch (error) {
+        showNotification('Ollama not found at ' + ip, 'error');
+    } finally {
+        elements.testOllamaBtn.textContent = '🔄 Test Connection';
+    }
+}
+
+function updateGenerateButtonState() {
+    if (state.aiBackend === 'local') {
+        elements.generateAiBtn.disabled = !state.localModelLoaded;
+    } else {
+        elements.generateAiBtn.disabled = false;
     }
 }
 

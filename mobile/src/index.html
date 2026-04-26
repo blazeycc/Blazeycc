@@ -186,7 +186,39 @@
                 <button id="closeAiAssistBtn" class="btn btn-small">✕</button>
             </div>
             <div class="panel-content">
-                <button id="generateAiBtn" class="btn btn-primary" style="width:100%;margin-bottom:0.75rem;">Generate Metadata</button>
+                <!-- Model Manager -->
+                <div id="modelManager" style="margin-bottom:1rem;padding:0.75rem;background:var(--bg-input);border-radius:8px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+                        <strong style="font-size:0.85rem;">🧠 AI Model</strong>
+                        <span id="modelStatus" style="font-size:0.75rem;color:var(--text-muted);">No model</span>
+                    </div>
+                    <select id="aiBackend" style="width:100%;margin-bottom:0.5rem;">
+                        <option value="local">On-Device (Local)</option>
+                        <option value="remote">Ollama on Desktop (WiFi)</option>
+                    </select>
+                    <div id="localModelControls">
+                        <select id="modelSelect" style="width:100%;margin-bottom:0.5rem;">
+                            <option value="qwen2.5-1.5b-q4_0.gguf">Qwen 2.5 1.5B (Q4_0) — ~1.1GB</option>
+                            <option value="qwen2.5-0.5b-q4_0.gguf">Qwen 2.5 0.5B (Q4_0) — ~400MB</option>
+                            <option value="phi-4-mini-Q4_0.gguf">Phi-4 Mini (Q4_0) — ~2.2GB</option>
+                        </select>
+                        <button id="downloadModelBtn" class="btn btn-primary btn-small" style="width:100%;">⬇️ Download Model</button>
+                        <div id="downloadProgress" style="display:none;margin-top:0.5rem;">
+                            <div style="height:4px;background:var(--bg-secondary);border-radius:2px;overflow:hidden;">
+                                <div id="downloadProgressBar" style="height:100%;background:var(--accent-primary);width:0%;transition:width 0.3s;"></div>
+                            </div>
+                            <span id="downloadProgressText" style="font-size:0.7rem;color:var(--text-muted);">0%</span>
+                        </div>
+                        <button id="loadModelBtn" class="btn btn-primary btn-small" style="width:100%;margin-top:0.5rem;display:none;">🚀 Load Model</button>
+                    </div>
+                    <div id="remoteModelControls" style="display:none;">
+                        <label style="font-size:0.75rem;color:var(--text-muted);">Ollama IP</label>
+                        <input type="text" id="ollamaIp" value="192.168.1.42:11434" placeholder="192.168.1.42:11434" style="width:100%;margin-bottom:0.5rem;">
+                        <button id="testOllamaBtn" class="btn btn-small" style="width:100%;">🔄 Test Connection</button>
+                    </div>
+                </div>
+
+                <button id="generateAiBtn" class="btn btn-primary" style="width:100%;margin-bottom:0.75rem;" disabled>Generate Metadata</button>
                 <div id="aiStatus" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;"></div>
                 <div id="aiResults" style="display:none;">
                     <label>Title</label>
