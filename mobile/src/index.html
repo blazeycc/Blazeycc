@@ -13,48 +13,107 @@
         <!-- Header -->
         <header class="header">
             <h1>🎬 Blazeycc</h1>
+            <div class="header-actions">
+                <button id="themeToggleBtn" class="btn btn-icon">🌙</button>
+                <button id="historyBtn" class="btn btn-icon">📁</button>
+                <button id="aiAssistBtn" class="btn btn-icon">✨</button>
+            </div>
         </header>
 
-        <!-- URL Input -->
+        <!-- Bookmarks Bar -->
+        <section class="bookmarks-bar" id="bookmarksBar" style="display:none;">
+            <span class="bookmarks-label">⭐</span>
+            <div class="bookmarks-list" id="bookmarksList"></div>
+            <button id="addBookmarkBtn" class="btn btn-small" disabled>+</button>
+        </section>
+
+        <!-- URL Input Section -->
         <section class="url-section">
             <input type="url" id="urlInput" placeholder="Enter website URL">
             <button id="loadBtn" class="btn btn-primary">🌐 Load</button>
         </section>
 
+        <!-- Annotation Toolbar -->
+        <div class="annotation-toolbar" id="annotationToolbar" style="display:none;">
+            <button class="btn btn-small annotation-tool active" data-tool="select" title="Select">↖</button>
+            <button class="btn btn-small annotation-tool" data-tool="arrow" title="Arrow">➤</button>
+            <button class="btn btn-small annotation-tool" data-tool="rectangle" title="Rectangle">▢</button>
+            <button class="btn btn-small annotation-tool" data-tool="circle" title="Circle">○</button>
+            <button class="btn btn-small annotation-tool" data-tool="highlight" title="Highlight">🖌️</button>
+            <button class="btn btn-small annotation-tool" data-tool="text" title="Text">T</button>
+            <input type="color" id="annotationColor" value="#ff0000" style="width:32px;height:32px;border:none;border-radius:4px;">
+            <select id="annotationSize" style="width:50px;">
+                <option value="2">S</option>
+                <option value="4" selected>M</option>
+                <option value="8">L</option>
+            </select>
+            <button id="undoAnnotationBtn" class="btn btn-small">↩️</button>
+            <button id="clearAnnotationsBtn" class="btn btn-small">🗑️</button>
+            <button id="closeAnnotationsBtn" class="btn btn-small">✕</button>
+        </div>
+
         <!-- Recording Controls -->
         <div class="record-bar">
-            <button id="recordBtn" class="btn btn-record" disabled>🔴 Record</button>
-            <button id="stopBtn" class="btn btn-stop" disabled>⏹ Stop</button>
-            <span id="recordingTimer" class="timer">00:00</span>
-        </div>
-
-        <!-- Browser / WebView Area -->
-        <div class="browser-container" id="browserContainer">
-            <div class="placeholder" id="placeholder">
-                <div class="placeholder-icon">🌐</div>
-                <p>Enter a URL to start</p>
+            <div class="zoom-controls">
+                <button id="zoomOutBtn" class="btn btn-icon">🔍-</button>
+                <span id="zoomLevelDisplay">100%</span>
+                <button id="zoomInBtn" class="btn btn-icon">🔍+</button>
+                <button id="zoomResetBtn" class="btn btn-icon">🔍⟲</button>
             </div>
-            <iframe id="browserFrame" style="display:none;width:100%;height:100%;border:none;"></iframe>
+            <div class="record-controls">
+                <button id="annotateToggleBtn" class="btn btn-small">🎨</button>
+                <button id="autoScrollBtn" class="btn btn-small">📜</button>
+                <button id="recordBtn" class="btn btn-record" disabled>🔴</button>
+                <button id="stopBtn" class="btn btn-stop" disabled>⏹</button>
+                <span id="recordingTimer" class="timer">00:00</span>
+            </div>
         </div>
 
-        <!-- Settings Toggle -->
-        <button id="settingsToggle" class="btn btn-icon settings-fab">⚙️</button>
+        <!-- Browser / WebView Area with Annotation Overlay -->
+        <div class="browser-wrapper" id="browserWrapper">
+            <div class="browser-container" id="browserContainer">
+                <div class="placeholder" id="placeholder">
+                    <div class="placeholder-icon">🌐</div>
+                    <p>Enter a URL to start</p>
+                </div>
+                <iframe id="browserFrame" style="display:none;width:100%;height:100%;border:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+                <canvas id="annotationCanvas" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:auto;touch-action:none;"></canvas>
+            </div>
+        </div>
 
-        <!-- Settings Panel (bottom sheet) -->
+        <!-- Settings FAB -->
+        <button id="settingsToggle" class="btn settings-fab">⚙️</button>
+
+        <!-- Settings Bottom Sheet -->
+        <div class="sheet-backdrop" id="settingsBackdrop"></div>
         <div class="settings-sheet" id="settingsSheet">
             <div class="sheet-header">
                 <div class="sheet-handle"></div>
-                <h3>Settings</h3>
+                <h3>⚙️ Settings</h3>
             </div>
             <div class="sheet-content">
                 <div class="setting-group">
-                    <label>Preset</label>
+                    <label>Output Format</label>
+                    <select id="outputFormat">
+                        <option value="mp4" selected>MP4</option>
+                        <option value="webm">WebM</option>
+                        <option value="gif">GIF</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Platform Preset</label>
                     <select id="formatPreset">
                         <option value="custom">Custom</option>
                         <option value="yt-shorts" selected>YouTube Shorts (9:16)</option>
                         <option value="ig-story">Instagram Story/Reels</option>
                         <option value="tiktok">TikTok</option>
                         <option value="yt-1080p">YouTube 1080p</option>
+                        <option value="yt-720p">YouTube 720p</option>
+                        <option value="ig-feed">Instagram Feed</option>
+                        <option value="twitter-landscape">Twitter Landscape</option>
+                        <option value="twitter-square">Twitter Square</option>
+                        <option value="linkedin-landscape">LinkedIn Landscape</option>
+                        <option value="fb-feed">Facebook Feed</option>
                     </select>
                 </div>
                 <div class="setting-group">
@@ -63,11 +122,14 @@
                         <option value="low">Low</option>
                         <option value="medium" selected>Medium</option>
                         <option value="high">High</option>
+                        <option value="ultra">Ultra</option>
                     </select>
                 </div>
                 <div class="setting-group">
                     <label>Frame Rate</label>
                     <select id="frameRateSelect">
+                        <option value="5">5 FPS</option>
+                        <option value="10">10 FPS</option>
                         <option value="15" selected>15 FPS</option>
                         <option value="30">30 FPS</option>
                     </select>
@@ -75,26 +137,110 @@
                 <div class="setting-group">
                     <label>
                         <input type="checkbox" id="autoZoomToggle" checked>
-                        Auto-Zoom on Tap
+                        🔍 Auto-Zoom on Tap
                     </label>
+                </div>
+                <div class="setting-group auto-zoom-options" id="autoZoomOptions">
+                    <label>Zoom Level</label>
+                    <input type="range" id="autoZoomLevel" min="1.1" max="3.0" step="0.1" value="1.6">
+                    <span id="autoZoomLevelValue">1.6x</span>
+                    <label>Duration (ms)</label>
+                    <input type="range" id="autoZoomDuration" min="500" max="5000" step="100" value="1500">
+                    <span id="autoZoomDurationValue">1500ms</span>
                 </div>
                 <div class="setting-group">
                     <label>
-                        <input type="checkbox" id="motionBlurToggle">
-                        Motion Blur
+                        <input type="checkbox" id="enableBatch">
+                        📋 Batch Recording
                     </label>
+                    <div id="batchSection" style="display:none;margin-top:0.5rem;">
+                        <textarea id="batchUrls" rows="3" placeholder="URL per line"></textarea>
+                        <label>Duration (sec)</label>
+                        <input type="number" id="batchDuration" value="30" min="5" max="300" style="width:80px;">
+                        <button id="startBatchBtn" class="btn btn-primary btn-small">▶ Start</button>
+                        <div id="batchProgress" style="display:none;margin-top:0.5rem;font-size:0.8rem;">
+                            <span id="batchCurrentNum">0</span> / <span id="batchTotalNum">0</span>
+                        </div>
+                    </div>
                 </div>
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="enableSchedule">
+                        ⏰ Scheduled Recording
+                    </label>
+                    <div id="scheduleSection" style="display:none;margin-top:0.5rem;">
+                        <input type="url" id="scheduleUrl" placeholder="https://example.com" style="width:100%;margin-bottom:0.3rem;">
+                        <input type="datetime-local" id="scheduleTime" style="width:100%;margin-bottom:0.3rem;">
+                        <input type="number" id="scheduleDuration" value="60" min="5" max="3600" style="width:80px;">
+                        <button id="addScheduleBtn" class="btn btn-primary btn-small">+ Add</button>
+                        <div id="scheduleList" style="margin-top:0.5rem;max-height:100px;overflow-y:auto;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Assist Panel -->
+        <div class="side-panel" id="aiAssistPanel" style="display:none;">
+            <div class="panel-header">
+                <h3>✨ AI Assist</h3>
+                <button id="closeAiAssistBtn" class="btn btn-small">✕</button>
+            </div>
+            <div class="panel-content">
+                <button id="generateAiBtn" class="btn btn-primary" style="width:100%;margin-bottom:0.75rem;">Generate Metadata</button>
+                <div id="aiStatus" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;"></div>
+                <div id="aiResults" style="display:none;">
+                    <label>Title</label>
+                    <input type="text" id="aiTitle" readonly style="width:100%;margin-bottom:0.5rem;">
+                    <label>Description</label>
+                    <textarea id="aiDescription" rows="3" readonly style="width:100%;margin-bottom:0.5rem;"></textarea>
+                    <label>Hashtags</label>
+                    <input type="text" id="aiHashtags" readonly style="width:100%;">
+                </div>
+            </div>
+        </div>
+
+        <!-- History Panel -->
+        <div class="side-panel" id="historyPanel" style="display:none;">
+            <div class="panel-header">
+                <h3>📁 History</h3>
+                <button id="closeHistoryBtn" class="btn btn-small">✕</button>
+                <button id="clearHistoryBtn" class="btn btn-small">🗑️</button>
+            </div>
+            <div class="panel-content" id="historyList">
+                <p class="empty-message">No recordings yet</p>
             </div>
         </div>
 
         <!-- Preview Modal -->
         <div class="preview-modal" id="previewModal" style="display:none;">
             <div class="preview-content">
+                <div class="preview-header">
+                    <h3>📹 Preview</h3>
+                    <button id="closePreviewBtn" class="btn btn-small">✕</button>
+                </div>
                 <video id="previewVideo" controls playsinline></video>
                 <div class="preview-actions">
                     <button id="discardBtn" class="btn btn-danger">🗑️ Discard</button>
                     <button id="shareBtn" class="btn btn-primary">📤 Share</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Onboarding Modal -->
+        <div class="onboarding-modal" id="onboardingModal" style="display:none;">
+            <div class="onboarding-content">
+                <h2>Welcome to Blazeycc 🎬</h2>
+                <p>Record any website as video</p>
+                <div class="onboarding-steps">
+                    <div class="step"><div class="step-num">1</div><strong>Load URL</strong><span>Enter any website</span></div>
+                    <div class="step"><div class="step-num">2</div><strong>Record</strong><span>Tap the red button</span></div>
+                    <div class="step"><div class="step-num">3</div><strong>Share</strong><span>Export to any platform</span></div>
+                </div>
+                <label style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0;font-size:0.85rem;">
+                    <input type="checkbox" id="skipOnboarding">
+                    Don't show again
+                </label>
+                <button id="closeOnboardingBtn" class="btn btn-primary" style="width:100%;">Get Started</button>
             </div>
         </div>
     </div>

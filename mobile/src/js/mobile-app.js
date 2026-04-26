@@ -1,11 +1,64 @@
-// Blazeycc Mobile App
-// Capacitor-based: uses native screen recording instead of canvas capture
+// Blazeycc Mobile — Full-Featured Android App
+// Uses Capacitor native screen recording + canvas annotations + AI via Ollama
 
 import { ScreenRecorder } from '@blazeycc/screen-recorder';
 import { Share } from '@capacitor/share';
-import { Filesystem } from '@capacitor/filesystem';
+import { Toast } from '@capacitor/toast';
 
-// DOM Elements
+// =====================
+// STATE & CONFIG
+// =====================
+
+const state = {
+    isRecording: false,
+    recordingStartTime: null,
+    timerInterval: null,
+    websiteLoaded: false,
+    currentUrl: '',
+    zoomLevel: 1,
+    autoScrollInterval: null,
+    autoScrollEnabled: false,
+    annotationEnabled: false,
+    annotationTool: 'select',
+    annotationColor: '#ff0000',
+    annotationSize: 4,
+    annotationObjects: [],
+    annotationUndone: [],
+    isDragging: false,
+    isResizing: false,
+    selectedObj: null,
+    dragStartX: 0,
+    dragStartY: 0,
+    lastVideoPath: null,
+    lastRecordingDuration: 0,
+    bookmarks: [],
+    history: [],
+    scheduledRecordings: [],
+    theme: 'dark',
+    ollamaConfig: { endpoint: 'http://localhost:11434', model: 'qwen2.5:4b' },
+    batchQueue: [],
+    batchRecordingInProgress: false,
+    batchCurrentIndex: 0
+};
+
+const FORMAT_PRESETS = {
+    'custom': { width: 1080, height: 1920 },
+    'yt-shorts': { width: 1080, height: 1920 },
+    'ig-story': { width: 1080, height: 1920 },
+    'tiktok': { width: 1080, height: 1920 },
+    'yt-1080p': { width: 1920, height: 1080 },
+    'yt-720p': { width: 1280, height: 720 },
+    'ig-feed': { width: 1080, height: 1080 },
+    'twitter-landscape': { width: 1280, height: 720 },
+    'twitter-square': { width: 1080, height: 1080 },
+    'linkedin-landscape': { width: 1920, height: 1080 },
+    'fb-feed': { width: 1080, height: 1080 }
+};
+
+// =====================
+// DOM ELEMENTS
+// =====================
+
 const elements = {
     urlInput: document.getElementById('urlInput'),
     loadBtn: document.getElementById('loadBtn'),
@@ -15,7 +68,14 @@ const elements = {
     placeholder: document.getElementById('placeholder'),
     browserFrame: document.getElementById('browserFrame'),
     browserContainer: document.getElementById('browserContainer'),
+    annotationCanvas: document.getElementById('annotationCanvas'),
+    zoomInBtn: document.getElementById('zoomInBtn'),
+    zoomOutBtn: document.getElementById('zoomOutBtn'),
+    zoomResetBtn: document.getElementById('zoomResetBtn'),
+    zoomLevelDisplay: document.getElementById('zoomLevelDisplay'),
+    autoScrollBtn: document.getElementById('autoScrollBtn'),
     settingsToggle: document.getElementById('settingsToggle'),
+    settingsBackdrop: document.getElementById('settingsBackdrop'),
     settingsSheet: document.getElementById('settingsSheet'),
     previewModal: document.getElementById('previewModal'),
     previewVideo: document.getElementById('previewVideo'),
@@ -25,67 +85,184 @@ const elements = {
     qualitySetting: document.getElementById('qualitySetting'),
     frameRateSelect: document.getElementById('frameRateSelect'),
     autoZoomToggle: document.getElementById('autoZoomToggle'),
-    motionBlurToggle: document.getElementById('motionBlurToggle')
+    autoZoomLevel: document.getElementById('autoZoomLevel'),
+    autoZoomLevelValue: document.getElementById('autoZoomLevelValue'),
+    autoZoomDuration: document.getElementById('autoZoomDuration'),
+    autoZoomDurationValue: document.getElementById('autoZoomDurationValue'),
+    autoZoomOptions: document.getElementById('autoZoomOptions'),
+    annotationToolbar: document.getElementById('annotationToolbar'),
+    annotateToggleBtn: document.getElementById('annotateToggleBtn'),
+    annotationColor: document.getElementById('annotationColor'),
+    annotationSize: document.getElementById('annotationSize'),
+    clearAnnotationsBtn: document.getElementById('clearAnnotationsBtn'),
+    undoAnnotationBtn: document.getElementById('undoAnnotationBtn'),
+    closeAnnotationsBtn: document.getElementById('closeAnnotationsBtn'),
+    themeToggleBtn: document.getElementById('themeToggleBtn'),
+    historyBtn: document.getElementById('historyBtn'),
+    historyPanel: document.getElementById('historyPanel'),
+    closeHistoryBtn: document.getElementById('closeHistoryBtn'),
+    clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+    historyList: document.getElementById('historyList'),
+    aiAssistBtn: document.getElementById('aiAssistBtn'),
+    aiAssistPanel: document.getElementById('aiAssistPanel'),
+    closeAiAssistBtn: document.getElementById('closeAiAssistBtn'),
+    generateAiBtn: document.getElementById('generateAiBtn'),
+    aiStatus: document.getElementById('aiStatus'),
+    aiResults: document.getElementById('aiResults'),
+    aiTitle: document.getElementById('aiTitle'),
+    aiDescription: document.getElementById('aiDescription'),
+    aiHashtags: document.getElementById('aiHashtags'),
+    bookmarksBar: document.getElementById('bookmarksBar'),
+    bookmarksList: document.getElementById('bookmarksList'),
+    addBookmarkBtn: document.getElementById('addBookmarkBtn'),
+    onboardingModal: document.getElementById('onboardingModal'),
+    closeOnboardingBtn: document.getElementById('closeOnboardingBtn'),
+    skipOnboarding: document.getElementById('skipOnboarding'),
+    enableBatch: document.getElementById('enableBatch'),
+    batchSection: document.getElementById('batchSection'),
+    batchUrls: document.getElementById('batchUrls'),
+    batchDuration: document.getElementById('batchDuration'),
+    startBatchBtn: document.getElementById('startBatchBtn'),
+    batchProgress: document.getElementById('batchProgress'),
+    batchCurrentNum: document.getElementById('batchCurrentNum'),
+    batchTotalNum: document.getElementById('batchTotalNum'),
+    enableSchedule: document.getElementById('enableSchedule'),
+    scheduleSection: document.getElementById('scheduleSection'),
+    scheduleUrl: document.getElementById('scheduleUrl'),
+    scheduleTime: document.getElementById('scheduleTime'),
+    scheduleDuration: document.getElementById('scheduleDuration'),
+    addScheduleBtn: document.getElementById('addScheduleBtn'),
+    scheduleList: document.getElementById('scheduleList')
 };
 
-// State
-const state = {
-    isRecording: false,
-    recordingStartTime: null,
-    timerInterval: null,
-    websiteLoaded: false,
-    lastVideoPath: null
-};
+// Notification container
+let notificationsContainer;
 
-// Format presets (mobile-optimized subset)
-const FORMAT_PRESETS = {
-    'custom': { width: 1080, height: 1920 },
-    'yt-shorts': { width: 1080, height: 1920 },
-    'ig-story': { width: 1080, height: 1920 },
-    'tiktok': { width: 1080, height: 1920 },
-    'yt-1080p': { width: 1920, height: 1080 }
-};
+// =====================
+// INIT
+// =====================
 
-// Initialize
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
+    // Create notification container
+    notificationsContainer = document.createElement('div');
+    notificationsContainer.className = 'notifications';
+    document.body.appendChild(notificationsContainer);
+
     // URL loading
     elements.loadBtn.addEventListener('click', loadWebsite);
-    elements.urlInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') loadWebsite();
-    });
+    elements.urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadWebsite(); });
 
     // Recording
     elements.recordBtn.addEventListener('click', startRecording);
     elements.stopBtn.addEventListener('click', stopRecording);
 
-    // Settings sheet
-    elements.settingsToggle.addEventListener('click', toggleSettings);
+    // Zoom controls
+    elements.zoomInBtn.addEventListener('click', zoomIn);
+    elements.zoomOutBtn.addEventListener('click', zoomOut);
+    elements.zoomResetBtn.addEventListener('click', resetZoom);
 
-    // Preview actions
+    // Auto-scroll
+    elements.autoScrollBtn.addEventListener('click', toggleAutoScroll);
+
+    // Settings
+    elements.settingsToggle.addEventListener('click', toggleSettings);
+    elements.settingsBackdrop.addEventListener('click', closeSettings);
+    elements.autoZoomToggle.addEventListener('change', (e) => {
+        elements.autoZoomOptions.style.display = e.target.checked ? 'block' : 'none';
+    });
+    elements.autoZoomLevel.addEventListener('input', (e) => {
+        elements.autoZoomLevelValue.textContent = e.target.value + 'x';
+    });
+    elements.autoZoomDuration.addEventListener('input', (e) => {
+        elements.autoZoomDurationValue.textContent = e.target.value + 'ms';
+    });
+    elements.formatPreset.addEventListener('change', () => {
+        if (state.websiteLoaded) applyPresetAspectRatio();
+    });
+
+    // Annotation
+    elements.annotateToggleBtn.addEventListener('click', toggleAnnotations);
+    elements.closeAnnotationsBtn.addEventListener('click', toggleAnnotations);
+    elements.clearAnnotationsBtn.addEventListener('click', clearAnnotations);
+    elements.undoAnnotationBtn.addEventListener('click', undoAnnotation);
+    elements.annotationColor.addEventListener('change', (e) => { state.annotationColor = e.target.value; });
+    elements.annotationSize.addEventListener('change', (e) => { state.annotationSize = parseInt(e.target.value); });
+    document.querySelectorAll('.annotation-tool[data-tool]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.annotation-tool').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.annotationTool = btn.dataset.tool;
+        });
+    });
+    initAnnotationCanvas();
+
+    // Theme
+    elements.themeToggleBtn.addEventListener('click', toggleTheme);
+    loadTheme();
+
+    // History
+    elements.historyBtn.addEventListener('click', () => togglePanel('history'));
+    elements.closeHistoryBtn.addEventListener('click', () => togglePanel('history'));
+    elements.clearHistoryBtn.addEventListener('click', clearHistory);
+    loadHistory();
+
+    // AI Assist
+    elements.aiAssistBtn.addEventListener('click', () => togglePanel('ai'));
+    elements.closeAiAssistBtn.addEventListener('click', () => togglePanel('ai'));
+    elements.generateAiBtn.addEventListener('click', generateAiMetadata);
+
+    // Bookmarks
+    elements.addBookmarkBtn.addEventListener('click', addBookmark);
+    loadBookmarks();
+
+    // Onboarding
+    elements.closeOnboardingBtn.addEventListener('click', closeOnboarding);
+    showOnboardingIfNeeded();
+
+    // Batch
+    elements.enableBatch.addEventListener('change', (e) => {
+        elements.batchSection.style.display = e.target.checked ? 'block' : 'none';
+    });
+    elements.startBatchBtn.addEventListener('click', startBatchRecording);
+
+    // Scheduled
+    elements.enableSchedule.addEventListener('change', (e) => {
+        elements.scheduleSection.style.display = e.target.checked ? 'block' : 'none';
+    });
+    elements.addScheduleBtn.addEventListener('click', addScheduledRecording);
+
+    // Preview
+    elements.closePreviewBtn.addEventListener('click', closePreview);
     elements.discardBtn.addEventListener('click', discardVideo);
     elements.shareBtn.addEventListener('click', shareVideo);
 
-    // Close settings on backdrop tap
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('sheet-backdrop')) {
-            closeSettings();
-        }
-    });
-
     // Swipe to close settings
     let touchStartY = 0;
-    elements.settingsSheet.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-    });
+    elements.settingsSheet.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; });
     elements.settingsSheet.addEventListener('touchmove', (e) => {
-        const diff = e.touches[0].clientY - touchStartY;
-        if (diff > 50 && elements.settingsSheet.scrollTop === 0) {
+        if (e.touches[0].clientY - touchStartY > 80 && elements.settingsSheet.scrollTop === 0) {
             closeSettings();
         }
     });
 }
+
+// =====================
+// NOTIFICATIONS
+// =====================
+
+function showNotification(message, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `notification ${type}`;
+    el.textContent = message;
+    notificationsContainer.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+// =====================
+// URL LOADING
+// =====================
 
 function loadWebsite() {
     let url = elements.urlInput.value.trim();
@@ -96,11 +273,13 @@ function loadWebsite() {
     elements.browserFrame.style.display = 'block';
     elements.browserFrame.src = url;
     state.websiteLoaded = true;
+    state.currentUrl = url;
 
     elements.recordBtn.disabled = false;
+    elements.addBookmarkBtn.disabled = false;
 
-    // Apply preset aspect ratio
     applyPresetAspectRatio();
+    showNotification('Loading website...', 'info');
 }
 
 function applyPresetAspectRatio() {
@@ -111,7 +290,6 @@ function applyPresetAspectRatio() {
     const container = elements.browserContainer;
     const containerW = container.clientWidth;
     const containerH = container.clientHeight;
-
     const targetRatio = dims.width / dims.height;
     const containerRatio = containerW / containerH;
 
@@ -129,32 +307,32 @@ function applyPresetAspectRatio() {
     elements.browserFrame.style.margin = 'auto';
 }
 
+// =====================
+// RECORDING
+// =====================
+
 async function startRecording() {
     if (!state.websiteLoaded) return;
 
     try {
         const result = await ScreenRecorder.startRecording();
-        if (!result.started) {
-            throw new Error('Recording failed to start');
-        }
+        if (!result.started) throw new Error('Failed to start');
 
         state.isRecording = true;
         state.recordingStartTime = Date.now();
 
         elements.recordBtn.disabled = true;
-        elements.recordBtn.classList.add('recording');
         elements.stopBtn.disabled = false;
-
-        // Show recording indicator
         showRecordingIndicator();
 
-        // Start timer
         state.timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
 
+        if (elements.autoZoomToggle.checked) injectAutoZoom();
+
+        showNotification('Recording started!', 'success');
     } catch (error) {
-        console.error('Start recording error:', error);
-        alert('Failed to start recording: ' + error.message);
+        showNotification('Failed: ' + error.message, 'error');
     }
 }
 
@@ -165,22 +343,20 @@ async function stopRecording() {
         const result = await ScreenRecorder.stopRecording();
         state.isRecording = false;
         state.lastVideoPath = result.path;
+        state.lastRecordingDuration = Math.floor((Date.now() - state.recordingStartTime) / 1000);
 
         clearInterval(state.timerInterval);
-
         elements.recordBtn.disabled = false;
-        elements.recordBtn.classList.remove('recording');
         elements.stopBtn.disabled = true;
         elements.recordingTimer.textContent = '00:00';
-
         hideRecordingIndicator();
 
-        // Show preview
         showPreview(result.path);
+        addToHistory(result.path);
 
+        showNotification('Recording saved!', 'success');
     } catch (error) {
-        console.error('Stop recording error:', error);
-        alert('Failed to stop recording: ' + error.message);
+        showNotification('Failed: ' + error.message, 'error');
     }
 }
 
@@ -193,72 +369,735 @@ function updateTimer() {
 }
 
 function showRecordingIndicator() {
-    let indicator = document.querySelector('.recording-indicator');
-    if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.className = 'recording-indicator';
-        indicator.textContent = 'REC';
-        document.body.appendChild(indicator);
+    let ind = document.querySelector('.recording-indicator');
+    if (!ind) {
+        ind = document.createElement('div');
+        ind.className = 'recording-indicator';
+        ind.textContent = 'REC';
+        document.body.appendChild(ind);
     }
-    indicator.classList.add('active');
+    ind.classList.add('active');
 }
 
 function hideRecordingIndicator() {
-    const indicator = document.querySelector('.recording-indicator');
-    if (indicator) indicator.classList.remove('active');
+    const ind = document.querySelector('.recording-indicator');
+    if (ind) ind.classList.remove('active');
 }
 
-function showPreview(videoPath) {
-    elements.previewVideo.src = 'file://' + videoPath;
+// =====================
+// PREVIEW
+// =====================
+
+function showPreview(path) {
+    elements.previewVideo.src = 'file://' + path;
     elements.previewModal.style.display = 'flex';
 }
 
-function discardVideo() {
+function closePreview() {
     elements.previewModal.style.display = 'none';
     elements.previewVideo.src = '';
+}
+
+function discardVideo() {
+    closePreview();
     state.lastVideoPath = null;
+    showNotification('Discarded', 'info');
 }
 
 async function shareVideo() {
     if (!state.lastVideoPath) return;
+    try {
+        await Share.share({ title: 'Blazeycc Recording', files: [state.lastVideoPath], dialogTitle: 'Share' });
+    } catch (e) { console.error(e); }
+}
+
+// =====================
+// ZOOM
+// =====================
+
+function zoomIn() {
+    state.zoomLevel = Math.min(state.zoomLevel + 0.25, 3);
+    applyZoom();
+}
+
+function zoomOut() {
+    state.zoomLevel = Math.max(state.zoomLevel - 0.25, 0.5);
+    applyZoom();
+}
+
+function resetZoom() {
+    state.zoomLevel = 1;
+    applyZoom();
+}
+
+function applyZoom() {
+    elements.browserFrame.style.transform = `scale(${state.zoomLevel})`;
+    elements.browserFrame.style.transformOrigin = 'top left';
+    elements.zoomLevelDisplay.textContent = Math.round(state.zoomLevel * 100) + '%';
+}
+
+// =====================
+// AUTO-ZOOM (injected into iframe during recording)
+// =====================
+
+function injectAutoZoom() {
+    const frame = elements.browserFrame;
+    if (!frame || !frame.contentWindow) return;
+    const zoom = parseFloat(elements.autoZoomLevel.value) || 1.6;
+    const duration = parseInt(elements.autoZoomDuration.value) || 1500;
 
     try {
-        await Share.share({
-            title: 'Blazeycc Recording',
-            files: [state.lastVideoPath],
-            dialogTitle: 'Share your recording'
-        });
-    } catch (error) {
-        console.error('Share failed:', error);
+        frame.contentWindow.postMessage({ type: 'blazeycc-autozoom', zoom, duration }, '*');
+    } catch (e) {}
+}
+
+// Listen for messages from iframe for auto-zoom
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'blazeycc-tap') {
+        // Could trigger auto-zoom response here
+    }
+});
+
+// =====================
+// AUTO-SCROLL
+// =====================
+
+function toggleAutoScroll() {
+    state.autoScrollEnabled = !state.autoScrollEnabled;
+    elements.autoScrollBtn.style.background = state.autoScrollEnabled ? 'var(--accent-primary)' : '';
+
+    if (state.autoScrollEnabled && state.websiteLoaded) {
+        startAutoScroll();
+        showNotification('Auto-scroll started', 'info');
+    } else {
+        stopAutoScroll();
+        showNotification('Auto-scroll stopped', 'info');
     }
 }
 
-// Settings Sheet
+function startAutoScroll() {
+    stopAutoScroll();
+    state.autoScrollInterval = setInterval(() => {
+        try {
+            const frame = elements.browserFrame;
+            if (frame && frame.contentWindow) {
+                frame.contentWindow.scrollBy(0, 3);
+            }
+        } catch (e) {}
+    }, 50);
+}
+
+function stopAutoScroll() {
+    if (state.autoScrollInterval) {
+        clearInterval(state.autoScrollInterval);
+        state.autoScrollInterval = null;
+    }
+}
+
+// =====================
+// ANNOTATIONS (Canvas Overlay)
+// =====================
+
+function initAnnotationCanvas() {
+    const canvas = elements.annotationCanvas;
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let startX, startY;
+
+    function resizeCanvas() {
+        const container = elements.browserContainer;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        redrawAnnotations();
+    }
+
+    canvas.addEventListener('touchstart', handleStart, { passive: false });
+    canvas.addEventListener('touchmove', handleMove, { passive: false });
+    canvas.addEventListener('touchend', handleEnd);
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function handleStart(e) {
+        if (!state.annotationEnabled) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        startX = pos.x;
+        startY = pos.y;
+        isDrawing = true;
+
+        if (state.annotationTool === 'select') {
+            // Hit test
+            for (let i = state.annotationObjects.length - 1; i >= 0; i--) {
+                const obj = state.annotationObjects[i];
+                if (hitTest(obj, startX, startY)) {
+                    state.selectedObj = obj;
+                    state.isDragging = true;
+                    state.dragStartX = startX;
+                    state.dragStartY = startY;
+                    redrawAnnotations();
+                    return;
+                }
+            }
+            state.selectedObj = null;
+            redrawAnnotations();
+        }
+    }
+
+    function handleMove(e) {
+        if (!isDrawing || !state.annotationEnabled) return;
+        e.preventDefault();
+        const pos = getPos(e);
+
+        if (state.isDragging && state.selectedObj) {
+            const dx = pos.x - state.dragStartX;
+            const dy = pos.y - state.dragStartY;
+            moveObject(state.selectedObj, dx, dy);
+            state.dragStartX = pos.x;
+            state.dragStartY = pos.y;
+            redrawAnnotations();
+            return;
+        }
+
+        redrawAnnotations();
+        ctx.strokeStyle = state.annotationColor;
+        ctx.fillStyle = state.annotationColor;
+        ctx.lineWidth = state.annotationSize;
+        ctx.lineCap = 'round';
+
+        if (state.annotationTool === 'arrow') {
+            drawArrow(ctx, startX, startY, pos.x, pos.y, false);
+        } else if (state.annotationTool === 'rectangle') {
+            ctx.strokeRect(startX, startY, pos.x - startX, pos.y - startY);
+        } else if (state.annotationTool === 'circle') {
+            const rx = Math.abs(pos.x - startX) / 2;
+            const ry = Math.abs(pos.y - startY) / 2;
+            const cx = startX + (pos.x - startX) / 2;
+            const cy = startY + (pos.y - startY) / 2;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (state.annotationTool === 'highlight') {
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = state.annotationSize * 3;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            startX = pos.x;
+            startY = pos.y;
+        }
+    }
+
+    function handleEnd(e) {
+        if (!isDrawing) return;
+        isDrawing = false;
+        state.isDragging = false;
+        if (state.annotationTool === 'select') return;
+
+        const pos = getPos(e.changedTouches ? e.changedTouches[0] : e);
+        const obj = createAnnotationObject(state.annotationTool, startX, startY, pos.x, pos.y);
+        if (obj) {
+            state.annotationObjects.push(obj);
+            state.annotationUndone = [];
+        }
+        redrawAnnotations();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+}
+
+function hitTest(obj, x, y) {
+    const pad = 15;
+    if (obj.type === 'rectangle') {
+        return x >= Math.min(obj.x, obj.x + obj.w) - pad && x <= Math.max(obj.x, obj.x + obj.w) + pad &&
+               y >= Math.min(obj.y, obj.y + obj.h) - pad && y <= Math.max(obj.y, obj.y + obj.h) + pad;
+    } else if (obj.type === 'arrow') {
+        // Simple bounding box
+        return x >= Math.min(obj.x1, obj.x2) - pad && x <= Math.max(obj.x1, obj.x2) + pad &&
+               y >= Math.min(obj.y1, obj.y2) - pad && y <= Math.max(obj.y1, obj.y2) + pad;
+    } else if (obj.type === 'circle') {
+        const dx = (x - obj.cx) / Math.max(obj.rx, 1);
+        const dy = (y - obj.cy) / Math.max(obj.ry, 1);
+        return dx * dx + dy * dy <= 1.5;
+    } else if (obj.type === 'text') {
+        return x >= obj.x - pad && x <= obj.x + 100 + pad && y >= obj.y - 25 && y <= obj.y + pad;
+    }
+    return false;
+}
+
+function moveObject(obj, dx, dy) {
+    if (obj.type === 'arrow') {
+        obj.x1 += dx; obj.y1 += dy;
+        obj.x2 += dx; obj.y2 += dy;
+    } else if (obj.type === 'rectangle') {
+        obj.x += dx; obj.y += dy;
+    } else if (obj.type === 'circle') {
+        obj.cx += dx; obj.cy += dy;
+    } else if (obj.type === 'text') {
+        obj.x += dx; obj.y += dy;
+    }
+}
+
+function createAnnotationObject(tool, x1, y1, x2, y2) {
+    if (tool === 'arrow') {
+        return { type: 'arrow', x1, y1, x2, y2, color: state.annotationColor, size: state.annotationSize };
+    } else if (tool === 'rectangle') {
+        return { type: 'rectangle', x: x1, y: y1, w: x2 - x1, h: y2 - y1, color: state.annotationColor, size: state.annotationSize };
+    } else if (tool === 'circle') {
+        return { type: 'circle', cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, rx: Math.abs(x2 - x1) / 2, ry: Math.abs(y2 - y1) / 2, color: state.annotationColor, size: state.annotationSize };
+    } else if (tool === 'text') {
+        const text = prompt('Text:');
+        if (text) return { type: 'text', x: x1, y: y1, text, color: state.annotationColor, size: state.annotationSize };
+    }
+    return null;
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, isFinal) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLen = (isFinal ? 4 : 3) * state.annotationSize;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+}
+
+function redrawAnnotations() {
+    const canvas = elements.annotationCanvas;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const obj of state.annotationObjects) {
+        ctx.strokeStyle = obj.color;
+        ctx.fillStyle = obj.color;
+        ctx.lineWidth = obj.size;
+        ctx.lineCap = 'round';
+
+        if (obj.type === 'arrow') drawArrow(ctx, obj.x1, obj.y1, obj.x2, obj.y2, true);
+        else if (obj.type === 'rectangle') ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+        else if (obj.type === 'circle') {
+            ctx.beginPath();
+            ctx.ellipse(obj.cx, obj.cy, obj.rx, obj.ry, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (obj.type === 'text') {
+            ctx.font = `bold ${obj.size * 5}px sans-serif`;
+            ctx.fillText(obj.text, obj.x, obj.y);
+        }
+    }
+
+    if (state.selectedObj) {
+        ctx.strokeStyle = '#00aaff';
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(0, 0, 10, 10); // simplified selection indicator
+        ctx.setLineDash([]);
+    }
+}
+
+function toggleAnnotations() {
+    state.annotationEnabled = !state.annotationEnabled;
+    elements.annotationToolbar.style.display = state.annotationEnabled ? 'flex' : 'none';
+    elements.annotationCanvas.style.display = state.annotationEnabled ? 'block' : 'none';
+    elements.annotateToggleBtn.style.background = state.annotationEnabled ? 'var(--accent-primary)' : '';
+
+    if (state.annotationEnabled) {
+        const canvas = elements.annotationCanvas;
+        canvas.width = elements.browserContainer.clientWidth;
+        canvas.height = elements.browserContainer.clientHeight;
+        redrawAnnotations();
+        showNotification('Annotations enabled', 'info');
+    } else {
+        showNotification('Annotations disabled', 'info');
+    }
+}
+
+function clearAnnotations() {
+    state.annotationObjects = [];
+    state.annotationUndone = [];
+    redrawAnnotations();
+    showNotification('Annotations cleared', 'info');
+}
+
+function undoAnnotation() {
+    if (state.annotationObjects.length > 0) {
+        state.annotationUndone.push(state.annotationObjects.pop());
+        redrawAnnotations();
+    }
+}
+
+// =====================
+// THEME
+// =====================
+
+function toggleTheme() {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', state.theme);
+    elements.themeToggleBtn.textContent = state.theme === 'dark' ? '🌙' : '☀️';
+    localStorage.setItem('blazeycc_theme', state.theme);
+}
+
+function loadTheme() {
+    const saved = localStorage.getItem('blazeycc_theme') || 'dark';
+    state.theme = saved;
+    document.documentElement.setAttribute('data-theme', saved);
+    elements.themeToggleBtn.textContent = saved === 'dark' ? '🌙' : '☀️';
+}
+
+// =====================
+// BOOKMARKS
+// =====================
+
+function loadBookmarks() {
+    const saved = localStorage.getItem('blazeycc_bookmarks');
+    state.bookmarks = saved ? JSON.parse(saved) : [];
+    renderBookmarks();
+}
+
+function renderBookmarks() {
+    elements.bookmarksList.innerHTML = '';
+    if (state.bookmarks.length === 0) {
+        elements.bookmarksBar.style.display = 'none';
+        return;
+    }
+    elements.bookmarksBar.style.display = 'flex';
+    state.bookmarks.forEach(bm => {
+        const chip = document.createElement('div');
+        chip.className = 'bookmark-chip';
+        chip.textContent = bm.title || new URL(bm.url).hostname;
+        chip.addEventListener('click', () => {
+            elements.urlInput.value = bm.url;
+            loadWebsite();
+        });
+        elements.bookmarksList.appendChild(chip);
+    });
+}
+
+function addBookmark() {
+    if (!state.currentUrl) return;
+    const title = new URL(state.currentUrl).hostname;
+    state.bookmarks.push({ url: state.currentUrl, title });
+    localStorage.setItem('blazeycc_bookmarks', JSON.stringify(state.bookmarks));
+    renderBookmarks();
+    showNotification('Bookmark added!', 'success');
+}
+
+// =====================
+// HISTORY
+// =====================
+
+function loadHistory() {
+    const saved = localStorage.getItem('blazeycc_history');
+    state.history = saved ? JSON.parse(saved) : [];
+    renderHistory();
+}
+
+function renderHistory() {
+    if (state.history.length === 0) {
+        elements.historyList.innerHTML = '<p class="empty-message">No recordings yet</p>';
+        return;
+    }
+    elements.historyList.innerHTML = '';
+    state.history.slice().reverse().forEach(rec => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+            <span class="history-filename">${rec.filename || 'Recording'}</span>
+            <span class="history-meta">${rec.preset || 'Custom'} • ${rec.duration || 0}s</span>
+        `;
+        elements.historyList.appendChild(item);
+    });
+}
+
+function addToHistory(path) {
+    const filename = path.split('/').pop();
+    const preset = elements.formatPreset.value;
+    const duration = state.lastRecordingDuration;
+    state.history.push({ path, filename, preset, duration, date: new Date().toISOString() });
+    localStorage.setItem('blazeycc_history', JSON.stringify(state.history));
+    renderHistory();
+}
+
+function clearHistory() {
+    state.history = [];
+    localStorage.removeItem('blazeycc_history');
+    renderHistory();
+    showNotification('History cleared', 'info');
+}
+
+// =====================
+// AI ASSIST (OLLAMA)
+// =====================
+
+async function generateAiMetadata() {
+    if (!state.websiteLoaded) {
+        showNotification('Load a website first', 'error');
+        return;
+    }
+
+    elements.aiStatus.textContent = 'Generating with qwen2.5:4b...';
+    elements.aiResults.style.display = 'none';
+
+    try {
+        const pageData = await extractPageData();
+        const prompt = `You are a social media expert. Based on this website, create:
+1. A catchy YouTube title (max 60 chars)
+2. A 2-sentence description
+3. 5 relevant hashtags
+
+Title: ${pageData.title}
+URL: ${pageData.url}
+H1: ${pageData.h1}
+
+Respond exactly:
+TITLE: <title>
+DESCRIPTION: <description>
+HASHTAGS: <hashtag1> <hashtag2> <hashtag3> <hashtag4> <hashtag5>`;
+
+        const response = await fetch(`${state.ollamaConfig.endpoint}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: state.ollamaConfig.model,
+                prompt: prompt,
+                stream: false,
+                options: { temperature: 0.7, num_predict: 200 }
+            })
+        });
+
+        if (!response.ok) throw new Error('Ollama not running');
+        const data = await response.json();
+        const result = parseAiResponse(data.response);
+
+        elements.aiTitle.value = result.title;
+        elements.aiDescription.value = result.description;
+        elements.aiHashtags.value = result.hashtags;
+        elements.aiResults.style.display = 'block';
+        elements.aiStatus.textContent = 'Done!';
+        showNotification('AI metadata generated!', 'success');
+    } catch (error) {
+        elements.aiStatus.textContent = '';
+        showNotification('AI failed: ' + error.message, 'error');
+    }
+}
+
+function extractPageData() {
+    return new Promise((resolve) => {
+        const frame = elements.browserFrame;
+        try {
+            const title = frame.contentDocument?.title || state.currentUrl;
+            const h1 = frame.contentDocument?.querySelector('h1')?.innerText?.substring(0, 200) || '';
+            resolve({ title, url: state.currentUrl, h1 });
+        } catch (e) {
+            resolve({ title: state.currentUrl, url: state.currentUrl, h1: '' });
+        }
+    });
+}
+
+function parseAiResponse(text) {
+    const lines = text.split('\n');
+    let title = '', description = '', hashtags = '';
+    for (const line of lines) {
+        const t = line.trim();
+        if (t.startsWith('TITLE:')) title = t.substring(6).trim();
+        else if (t.startsWith('DESCRIPTION:')) description = t.substring(12).trim();
+        else if (t.startsWith('HASHTAGS:')) hashtags = t.substring(9).trim();
+    }
+    if (!title) title = text.substring(0, 60);
+    return { title, description, hashtags };
+}
+
+// =====================
+// BATCH RECORDING
+// =====================
+
+async function startBatchRecording() {
+    if (state.batchRecordingInProgress) {
+        showNotification('Batch already running', 'warning');
+        return;
+    }
+
+    const urls = elements.batchUrls.value.trim().split('\n').filter(u => u.trim());
+    if (urls.length === 0) {
+        showNotification('Enter at least one URL', 'error');
+        return;
+    }
+
+    const duration = parseInt(elements.batchDuration.value || '30') * 1000;
+    state.batchQueue = urls.map(url => ({ url: url.trim(), duration }));
+    state.batchCurrentIndex = 0;
+    state.batchRecordingInProgress = true;
+    elements.batchProgress.style.display = 'block';
+
+    showNotification(`Starting batch: ${urls.length} URLs`, 'info');
+    await processBatchQueue();
+}
+
+async function processBatchQueue() {
+    if (state.batchCurrentIndex >= state.batchQueue.length) {
+        state.batchRecordingInProgress = false;
+        elements.batchProgress.style.display = 'none';
+        showNotification('Batch complete!', 'success');
+        return;
+    }
+
+    const item = state.batchQueue[state.batchCurrentIndex];
+    elements.batchCurrentNum.textContent = state.batchCurrentIndex + 1;
+    elements.batchTotalNum.textContent = state.batchQueue.length;
+
+    elements.urlInput.value = item.url;
+    loadWebsite();
+
+    await new Promise(r => setTimeout(r, 3000));
+    await startRecording();
+    await new Promise(r => setTimeout(r, item.duration));
+    await stopRecording();
+    await new Promise(r => setTimeout(r, 2000));
+
+    state.batchCurrentIndex++;
+    await processBatchQueue();
+}
+
+// =====================
+// SCHEDULED RECORDING
+// =====================
+
+function addScheduledRecording() {
+    const url = elements.scheduleUrl.value.trim();
+    const time = elements.scheduleTime.value;
+    const duration = parseInt(elements.scheduleDuration.value || '60');
+
+    if (!url || !time) {
+        showNotification('Enter URL and time', 'error');
+        return;
+    }
+
+    const timeMs = new Date(time).getTime();
+    if (timeMs <= Date.now()) {
+        showNotification('Select a future time', 'error');
+        return;
+    }
+
+    state.scheduledRecordings.push({ url, time: timeMs, duration, started: false });
+    renderScheduleList();
+    elements.scheduleUrl.value = '';
+    elements.scheduleTime.value = '';
+    showNotification('Recording scheduled!', 'success');
+
+    // Start checker if not already running
+    if (!window.scheduleCheckInterval) {
+        window.scheduleCheckInterval = setInterval(checkScheduledRecordings, 10000);
+    }
+}
+
+function renderScheduleList() {
+    if (state.scheduledRecordings.length === 0) {
+        elements.scheduleList.innerHTML = '<p class="empty-message">No schedules</p>';
+        return;
+    }
+    elements.scheduleList.innerHTML = state.scheduledRecordings.map((s, i) => `
+        <div class="schedule-item">
+            <span>${new URL(s.url).hostname} — ${new Date(s.time).toLocaleString()}</span>
+            <button class="btn btn-small btn-danger" onclick="window.removeSchedule(${i})">✕</button>
+        </div>
+    `).join('');
+}
+
+window.removeSchedule = function(index) {
+    state.scheduledRecordings.splice(index, 1);
+    renderScheduleList();
+};
+
+async function checkScheduledRecordings() {
+    const now = Date.now();
+    for (let i = state.scheduledRecordings.length - 1; i >= 0; i--) {
+        const s = state.scheduledRecordings[i];
+        if (s.time <= now && !s.started) {
+            s.started = true;
+            showNotification(`Starting scheduled: ${s.url}`, 'info');
+            elements.urlInput.value = s.url;
+            loadWebsite();
+            await new Promise(r => setTimeout(r, 3000));
+            await startRecording();
+            setTimeout(async () => {
+                await stopRecording();
+                state.scheduledRecordings.splice(i, 1);
+                renderScheduleList();
+            }, s.duration * 1000);
+        }
+    }
+}
+
+// =====================
+// SETTINGS PANEL
+// =====================
+
 function toggleSettings() {
     const isOpen = elements.settingsSheet.classList.contains('open');
     if (isOpen) closeSettings();
-    else openSettings();
-}
-
-function openSettings() {
-    elements.settingsSheet.classList.add('open');
-    // Add backdrop
-    let backdrop = document.querySelector('.sheet-backdrop');
-    if (!backdrop) {
-        backdrop = document.createElement('div');
-        backdrop.className = 'sheet-backdrop';
-        document.body.appendChild(backdrop);
+    else {
+        elements.settingsSheet.classList.add('open');
+        elements.settingsBackdrop.classList.add('active');
     }
-    backdrop.classList.add('active');
 }
 
 function closeSettings() {
     elements.settingsSheet.classList.remove('open');
-    const backdrop = document.querySelector('.sheet-backdrop');
-    if (backdrop) backdrop.classList.remove('active');
+    elements.settingsBackdrop.classList.remove('active');
 }
 
-// Handle orientation changes
+function togglePanel(name) {
+    if (name === 'history') {
+        const visible = elements.historyPanel.style.display !== 'none';
+        elements.historyPanel.style.display = visible ? 'none' : 'block';
+        elements.aiAssistPanel.style.display = 'none';
+    } else if (name === 'ai') {
+        const visible = elements.aiAssistPanel.style.display !== 'none';
+        elements.aiAssistPanel.style.display = visible ? 'none' : 'block';
+        elements.historyPanel.style.display = 'none';
+    }
+}
+
+// =====================
+// ONBOARDING
+// =====================
+
+function showOnboardingIfNeeded() {
+    if (!localStorage.getItem('blazeycc_onboarding_seen')) {
+        elements.onboardingModal.style.display = 'flex';
+    }
+}
+
+function closeOnboarding() {
+    elements.onboardingModal.style.display = 'none';
+    if (elements.skipOnboarding.checked) {
+        localStorage.setItem('blazeycc_onboarding_seen', 'true');
+    }
+}
+
+// =====================
+// ORIENTATION
+// =====================
+
 window.addEventListener('orientationchange', () => {
-    setTimeout(applyPresetAspectRatio, 300);
+    setTimeout(() => {
+        applyPresetAspectRatio();
+        if (state.annotationEnabled) {
+            elements.annotationCanvas.width = elements.browserContainer.clientWidth;
+            elements.annotationCanvas.height = elements.browserContainer.clientHeight;
+            redrawAnnotations();
+        }
+    }, 300);
 });
