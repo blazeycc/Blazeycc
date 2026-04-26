@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, dialog, webContents, sessi
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { spawn } = require('child_process');
 const ffmpeg = require('fluent-ffmpeg');
 const Store = require('electron-store').default || require('electron-store');
 const crypto = require('crypto');
@@ -905,21 +906,81 @@ ipcMain.handle('cancel-audio-capture', async () => {
     return { success: true };
 });
 
-ipcMain.handle('start-canvas-recording', async () => {
+ipcMain.handle('start-canvas-recording', async (event, { fps, webContentsId }) => {
     try {
-        // Create temp directory for frames
+        const ffmpegPath = getFFmpegPath();
+        if (!ffmpegPath) {
+            return { success: false, error: 'FFmpeg not found' };
+        }
+
         const tempDir = path.join(os.tmpdir(), `blazeycc-recording-${Date.now()}`);
         fs.mkdirSync(tempDir, { recursive: true });
-        
-        pendingFrameWrites = 0;
+        const tempVideoPath = path.join(tempDir, 'recording.mp4');
+
+        const ffmpegProcess = spawn(ffmpegPath, [
+            '-y',
+            '-f', 'image2pipe',
+            '-c:v', 'png',
+            '-r', String(fps || 15),
+            '-i', '-',
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '23',
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart',
+            tempVideoPath
+        ]);
+
+        let ffmpegError = '';
+        ffmpegProcess.stderr.on('data', (data) => {
+            ffmpegError += data.toString();
+        });
+
+        ffmpegProcess.on('error', (err) => {
+            console.error('FFmpeg process error:', err);
+        });
+
+        const captureIntervalMs = Math.round(1000 / (fps || 15));
+        let frameCount = 0;
+        let droppedFrames = 0;
+
+        const doCapture = async () => {
+            try {
+                const wc = webContentsId ? webContents.fromId(webContentsId) : (mainWindow?.webContents || null);
+                if (!wc) return;
+
+                const image = await wc.capturePage();
+                const pngBuffer = image.toPNG();
+
+                if (ffmpegProcess.stdin.writable && !ffmpegProcess.stdin.destroyed) {
+                    const ok = ffmpegProcess.stdin.write(pngBuffer);
+                    if (ok) {
+                        frameCount++;
+                    } else {
+                        droppedFrames++;
+                    }
+                } else {
+                    droppedFrames++;
+                }
+            } catch (err) {
+                console.error('Frame capture error:', err);
+            }
+        };
+
+        const captureInterval = setInterval(doCapture, captureIntervalMs);
+
         canvasRecordingSession = {
             tempDir,
-            frameCount: 0,
+            tempVideoPath,
             startTime: Date.now(),
-            fps: 5
+            fps: fps || 15,
+            ffmpegProcess,
+            captureInterval,
+            getFrameCount: () => frameCount,
+            getDroppedFrames: () => droppedFrames
         };
-        
-        console.log('Canvas recording started, temp dir:', tempDir);
+
+        console.log('Canvas recording started, temp video:', tempVideoPath, 'at', fps || 15, 'FPS');
         return { success: true, sessionId: tempDir };
     } catch (error) {
         console.error('Failed to start canvas recording:', error);
@@ -927,148 +988,69 @@ ipcMain.handle('start-canvas-recording', async () => {
     }
 });
 
-ipcMain.handle('capture-frame', async (event, frameData) => {
-    if (!canvasRecordingSession) {
-        return { success: false, error: 'No active recording session' };
-    }
-    
-    try {
-        const frameNumber = canvasRecordingSession.frameCount++;
-        const framePath = path.join(canvasRecordingSession.tempDir, `frame_${String(frameNumber).padStart(6, '0')}.png`);
-        
-        // frameData is base64 PNG data - use async write to avoid blocking
-        const base64Data = frameData.replace(/^data:image\/png;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
-        
-        // Track pending writes
-        pendingFrameWrites++;
-        fs.promises.writeFile(framePath, buffer)
-            .then(() => pendingFrameWrites--)
-            .catch(err => {
-                pendingFrameWrites--;
-                console.error('Frame write error:', err);
-            });
-        
-        return { success: true, frameNumber };
-    } catch (error) {
-        console.error('Failed to capture frame:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Capture frame from raw buffer (avoids base64 corruption)
-ipcMain.handle('capture-frame-buffer', async (event, buffer) => {
-    if (!canvasRecordingSession) {
-        return { success: false, error: 'No active recording session' };
-    }
-    
-    try {
-        const frameNumber = canvasRecordingSession.frameCount++;
-        const framePath = path.join(canvasRecordingSession.tempDir, `frame_${String(frameNumber).padStart(6, '0')}.png`);
-        
-        // buffer is a Uint8Array/Buffer sent directly over IPC
-        const nodeBuffer = Buffer.from(buffer);
-        
-        // Track pending writes
-        pendingFrameWrites++;
-        fs.promises.writeFile(framePath, nodeBuffer)
-            .then(() => pendingFrameWrites--)
-            .catch(err => {
-                pendingFrameWrites--;
-                console.error('Frame write error:', err);
-            });
-        
-        return { success: true, frameNumber };
-    } catch (error) {
-        console.error('Failed to capture frame buffer:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Capture the current webview/window frame
-ipcMain.handle('capture-webview-frame', async (event, webContentsId) => {
-    try {
-        let targetWebContents;
-        
-        // If webContentsId provided, capture that specific webContents (the webview)
-        if (webContentsId) {
-            const { webContents } = require('electron');
-            targetWebContents = webContents.fromId(webContentsId);
-        }
-        
-        // Fallback to main window
-        if (!targetWebContents && mainWindow) {
-            targetWebContents = mainWindow.webContents;
-        }
-        
-        if (!targetWebContents) {
-            return { success: false, error: 'No target to capture' };
-        }
-        
-        const image = await targetWebContents.capturePage();
-        const pngBuffer = image.toPNG();
-        const base64Data = 'data:image/png;base64,' + pngBuffer.toString('base64');
-        
-        return { success: true, data: base64Data };
-    } catch (error) {
-        console.error('Failed to capture webview frame:', error);
-        return { success: false, error: error.message };
-    }
-});
-
 ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, height, proSettings }) => {
-    if (!canvasRecordingSession || canvasRecordingSession.frameCount === 0) {
+    if (!canvasRecordingSession) {
+        return { success: false, error: 'No active recording session' };
+    }
+
+    const { tempDir, tempVideoPath, ffmpegProcess, captureInterval, getFrameCount, getDroppedFrames, startTime, fps } = canvasRecordingSession;
+    const frameCount = getFrameCount();
+    const droppedFrames = getDroppedFrames();
+
+    if (frameCount === 0) {
         return { success: false, error: 'No frames captured' };
     }
-    
+
     try {
-        const { tempDir, frameCount, startTime, fps } = canvasRecordingSession;
         const duration = (Date.now() - startTime) / 1000;
         const actualFps = Math.round(frameCount / duration) || fps;
-        
-        console.log(`Canvas recording stopped: ${frameCount} frames in ${duration}s (${actualFps} fps)`);
-        
-        // Wait for all pending frame writes to complete (max 10 seconds)
-        let waitTime = 0;
-        while (pendingFrameWrites > 0 && waitTime < 10000) {
-            console.log(`Waiting for ${pendingFrameWrites} pending frame writes...`);
-            await new Promise(resolve => setTimeout(resolve, 200));
-            waitTime += 200;
-        }
-        console.log('All frame writes completed');
-        
+
+        console.log(`Canvas recording stopped: ${frameCount} frames (${droppedFrames} dropped) in ${duration}s (${actualFps} fps)`);
+
+        // Stop capture interval
+        clearInterval(captureInterval);
+
+        // Close FFmpeg stdin and wait for it to finish
+        ffmpegProcess.stdin.end();
+        await new Promise((resolve, reject) => {
+            ffmpegProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`FFmpeg pipe exited with code ${code}`));
+                }
+            });
+            ffmpegProcess.on('error', (err) => reject(err));
+        });
+        console.log('FFmpeg pipe encoding complete:', tempVideoPath);
+
         // Generate output filename
         const savePath = store.get('savePath', path.join(os.homedir(), 'Downloads'));
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const outputFormat = format || 'mp4';
         const outputPath = path.join(savePath, `blazeycc_${timestamp}.${outputFormat}`);
-        
+
         const settings = proSettings || {};
         const useFastEncode = settings.fastEncode;
-        
-        // Build FFmpeg command
-        const inputPattern = path.join(tempDir, 'frame_%06d.png');
-        
+
         // Check for audio file to merge
         const audioPath = settings.audioPath;
         const hasAudio = audioPath && fs.existsSync(audioPath);
-        
+
         console.log('Audio merge check:', { hasAudio, audioPath });
-        
+
         // Check GPU encoding preference
         const gpuEncodingEnabled = store.get('gpuEncoding', false);
         const gpuEncoder = gpuEncodingEnabled ? await detectGpuEncoder() : { available: false };
         const useGpu = gpuEncoder.available;
         const gpuH264 = useGpu ? gpuEncoder.h264 : null;
         const gpuVp9 = useGpu ? gpuEncoder.vp9 : null;
-        
+
         console.log('GPU encoding:', { enabled: gpuEncodingEnabled, available: gpuEncoder.available, h264: gpuH264, vp9: gpuVp9, name: gpuEncoder.name });
-        
+
         return new Promise((resolve, reject) => {
             let command = ffmpeg()
-                .input(inputPattern)
-                .inputFPS(actualFps)
-                .fps(30);
+                .input(tempVideoPath);
             
             // Apply trim if specified
             const trimStart = settings.trimStart || 0;
@@ -1307,8 +1289,16 @@ ipcMain.handle('stop-canvas-recording', async (event, { format, quality, width, 
 });
 
 ipcMain.handle('cancel-canvas-recording', async () => {
-    if (canvasRecordingSession?.tempDir) {
-        fs.rmSync(canvasRecordingSession.tempDir, { recursive: true, force: true });
+    if (canvasRecordingSession) {
+        if (canvasRecordingSession.captureInterval) {
+            clearInterval(canvasRecordingSession.captureInterval);
+        }
+        if (canvasRecordingSession.ffmpegProcess) {
+            try { canvasRecordingSession.ffmpegProcess.kill('SIGKILL'); } catch (e) {}
+        }
+        if (canvasRecordingSession.tempDir) {
+            fs.rmSync(canvasRecordingSession.tempDir, { recursive: true, force: true });
+        }
     }
     canvasRecordingSession = null;
     return { success: true };

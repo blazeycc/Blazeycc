@@ -98,7 +98,17 @@ async function startRecording() {
     validation.warnings.forEach(warn => showNotification(warn, 'warning'));
 
     try {
-        const result = await window.electronAPI.startCanvasRecording();
+        const captureFps = await window.electronAPI.getFrameRate();
+
+        let webviewWebContentsId = null;
+        try {
+            webviewWebContentsId = elements.webview.getWebContentsId();
+            console.log('Webview webContents ID:', webviewWebContentsId);
+        } catch (e) {
+            console.warn('Could not get webview webContentsId:', e);
+        }
+
+        const result = await window.electronAPI.startCanvasRecording({ fps: captureFps, webContentsId: webviewWebContentsId });
         if (!result.success) {
             throw new Error(result.error || 'Failed to start recording');
         }
@@ -116,41 +126,7 @@ async function startRecording() {
         state.timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
 
-        const captureFps = await window.electronAPI.getFrameRate();
-        const captureIntervalMs = Math.round(1000 / captureFps);
-        console.log(`Recording at ${captureFps} FPS (${captureIntervalMs}ms interval)`);
-
-        state.frameCapturePending = false;
-        state.droppedFrames = 0;
-
-        let webviewWebContentsId = null;
-        try {
-            webviewWebContentsId = elements.webview.getWebContentsId();
-            console.log('Webview webContents ID:', webviewWebContentsId);
-        } catch (e) {
-            console.warn('Could not get webview webContentsId:', e);
-        }
-
-        state.frameCaptureInterval = setInterval(() => {
-            if (!state.canvasRecordingActive) return;
-            if (state.frameCapturePending) {
-                state.droppedFrames++;
-                return;
-            }
-            state.frameCapturePending = true;
-            window.electronAPI.captureWebviewFrame(webviewWebContentsId)
-                .then(async frameResult => {
-                    if (frameResult.success && state.canvasRecordingActive) {
-                        return window.electronAPI.captureFrame(frameResult.data);
-                    }
-                })
-                .catch(err => {
-                    console.error('Frame capture error:', err);
-                })
-                .finally(() => {
-                    state.frameCapturePending = false;
-                });
-        }, captureIntervalMs);
+        console.log(`Recording at ${captureFps} FPS`);
 
         if (state.audioEnabled) {
             await startAudioCapture();
