@@ -2,9 +2,11 @@
 
 Capacitor-based mobile app for Android. Record your screen while browsing websites.
 
-## Quick Start (No NDK needed!)
+## Quick Start
 
-If prebuilt `.so` files are already committed in this repo:
+### Option A: Prebuilt .so files already in repo (no NDK needed)
+
+If native libraries exist in `jniLibs/`:
 
 ```bash
 cd mobile
@@ -15,36 +17,34 @@ npx cap open android
 # Click ▶️ Run in Android Studio
 ```
 
-**Requirements:** Android Studio + SDK 33+. No NDK, no CMake, no C++ needed.
+**Requirements:** Android Studio + SDK 33+ only. No NDK, no CMake, no C++ needed.
 
----
+### Option B: Native libraries missing (first-time setup)
 
-## First-Time Setup (for maintainers)
+If `mobile/plugins/local-llm/android/src/main/jniLibs/` is empty, the CI will build them automatically on the next push to `main`. Or build manually:
 
-If native libraries are missing, build them once with the Android NDK:
-
-### 1. Install Android NDK
-Via Android Studio: **Tools → SDK Manager → SDK Tools → NDK (Side by side)**
-
-### 2. Set environment variable
 ```bash
+# Install Android NDK via Android Studio first
 export ANDROID_NDK_HOME="$HOME/Android/Sdk/ndk/25.2.9519653"
-```
-
-### 3. Build native libraries
-```bash
 cd mobile/plugins/local-llm
 ./build-native.sh
 ```
 
-This runs for ~3 minutes and outputs `.so` files to `android/src/main/jniLibs/`. After this, commit them:
+This clones llama.cpp and builds `.so` files for ~3 minutes.
 
-```bash
-git add android/src/main/jniLibs/
-git commit -m "Add prebuilt native libraries"
-```
+---
 
-From then on, **anyone can build the Android app without NDK**.
+## How Native Libraries Are Managed
+
+| Step | What Happens | Who Does It |
+|------|-------------|-------------|
+| 1. C++ code changes | `build-native-libs.yml` auto-triggers | GitHub Actions |
+| 2. Build .so files | NDK + CMake cross-compile for 3 ABIs | GitHub Actions |
+| 3. Commit .so files | Commits back to `main` with `[ci skip]` | GitHub Actions bot |
+| 4. Anyone clones repo | Gets prebuilt `.so` files | You |
+| 5. Build Android app | Gradle picks up `.so` files, no NDK needed | You |
+
+**Result:** Once CI commits the `.so` files, anyone can build the Android app with just Android Studio + SDK.
 
 ---
 
@@ -123,3 +123,4 @@ Connects to Ollama running on your laptop via WiFi.
 - Audio capture uses microphone (system audio requires root)
 - iframe CORS may block some websites
 - On-device AI is slow (~2-5 tokens/sec) but usable for metadata
+- Native libraries must be built once (handled by CI) before local AI works

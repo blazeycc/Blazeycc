@@ -1,0 +1,57 @@
+name: Build Native Libraries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/plugins/local-llm/android/src/main/cpp/**'
+      - 'mobile/plugins/local-llm/android/src/main/java/**'
+      - '.github/workflows/build-native-libs.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-commit-native-libs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+          link-to-system: true
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.22.x'
+
+      - name: Build native libraries
+        working-directory: ./mobile/plugins/local-llm
+        run: ./build-native.sh
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if git diff --quiet -- mobile/plugins/local-llm/android/src/main/jniLibs/; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push native libraries
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mobile/plugins/local-llm/android/src/main/jniLibs/
+          git commit -m "chore: update prebuilt Android native libraries [ci skip]"
+          git push
