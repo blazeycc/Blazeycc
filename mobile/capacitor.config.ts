@@ -5,8 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Blazeycc',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
-    iosScheme: 'https'
+    androidScheme: 'https'
   },
   plugins: {
     SplashScreen: {

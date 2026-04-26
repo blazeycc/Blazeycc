@@ -1,6 +1,6 @@
 # Blazeycc Mobile
 
-Capacitor-based mobile app for iOS and Android. Record your screen while browsing websites.
+Capacitor-based mobile app for Android. Record your screen while browsing websites.
 
 ## Architecture
 
@@ -14,16 +14,6 @@ Capacitor-based mobile app for iOS and Android. Record your screen while browsin
 cd mobile
 npm install
 ```
-
-## iOS Setup
-
-```bash
-npx cap add ios
-npx cap sync ios
-npx cap open ios
-```
-
-Then build in Xcode. Requires macOS and Xcode 14+.
 
 ## Android Setup
 
@@ -45,7 +35,7 @@ npm run dev
 
 ```bash
 npm run build
-npx cap sync
+npx cap sync android
 ```
 
 ## Screen Recorder Plugin
@@ -53,7 +43,6 @@ npx cap sync
 Located in `plugins/screen-recorder/`. This custom plugin handles native screen recording:
 
 - **Android:** Uses `MediaProjection` API to capture the entire screen with H.264 hardware encoding
-- **iOS:** Uses `ReplayKit` to capture the app view with `AVAssetWriter`
 
 ### Plugin API
 
@@ -85,7 +74,6 @@ ScreenRecorder.stopRecording(): Promise<{ path: string }>
 
 ## Known Issues
 
-- iOS ReplayKit only records the app, not system-wide
 - Android requires screen capture permission every session
 - Audio capture uses microphone on Android (system audio requires root on most devices)
 - Webview audio capture is not supported on mobile browsers
