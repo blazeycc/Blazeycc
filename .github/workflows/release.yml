@@ -168,7 +168,7 @@ jobs:
             artifacts/linux-builds/*
             artifacts/windows-builds/*
             artifacts/mac-builds/*
-            artifacts/android-builds/*
+            artifacts/android-builds/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
