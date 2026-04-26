@@ -19,4 +19,7 @@ export class LocalLlmWeb extends WebPlugin implements LocalLlmPlugin {
   async getModelPath(): Promise<{ path: string }> {
     return { path: '' };
   }
+  async isNativeLibAvailable(): Promise<{ available: boolean }> {
+    return { available: false };
+  }
 }

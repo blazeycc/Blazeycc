@@ -1120,16 +1120,27 @@ function togglePanel(name) {
 
 async function checkLocalModelStatus() {
     try {
+        // First check if native library is even available
+        const libCheck = await LocalLlm.isNativeLibAvailable();
+        if (!libCheck.available) {
+            elements.modelStatus.textContent = '❌ Native libs missing';
+            elements.modelStatus.style.color = 'var(--danger)';
+            elements.downloadModelBtn.style.display = 'none';
+            elements.loadModelBtn.style.display = 'none';
+            elements.modelSelect.disabled = true;
+            return;
+        }
+
+        elements.modelStatus.style.color = '';
         const result = await LocalLlm.getModelPath();
         const modelsDir = result.path;
         const filename = elements.modelSelect.value;
-        const modelPath = `${modelsDir}/${filename}`;
 
-        // Check if file exists using Capacitor Filesystem
+        // Check if file exists
         const { Filesystem } = await import('@capacitor/filesystem');
         try {
             await Filesystem.stat({ path: `models/${filename}`, directory: 'DATA' });
-            elements.modelStatus.textContent = 'Downloaded';
+            elements.modelStatus.textContent = 'Downloaded ✅';
             elements.downloadModelBtn.style.display = 'none';
             elements.loadModelBtn.style.display = 'block';
         } catch (e) {
@@ -1139,6 +1150,7 @@ async function checkLocalModelStatus() {
         }
     } catch (e) {
         console.error('Check model status failed', e);
+        elements.modelStatus.textContent = 'Status unknown';
     }
 }
 

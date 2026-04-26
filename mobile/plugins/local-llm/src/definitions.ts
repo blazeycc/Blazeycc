@@ -5,6 +5,7 @@ export interface LocalLlmPlugin {
   generate(options: { prompt: string; maxTokens?: number; temperature?: number }): Promise<{ text: string; tokensGenerated: number }>;
   isModelLoaded(): Promise<{ loaded: boolean }>;
   getModelPath(): Promise<{ path: string }>;
+  isNativeLibAvailable(): Promise<{ available: boolean }>;
 }
 
 declare module '@capacitor/core' {
