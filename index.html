@@ -394,6 +394,41 @@
                     </div>
                     <p class="help-text">Shows your webcam in the bottom-right corner of recordings.</p>
                 </div>
+                <!-- Batch Recording -->
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enableBatch">
+                        📋 Batch Recording (multiple URLs)
+                    </label>
+                    <div id="batchSection" style="display:none;margin-top:0.75rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);">URLs (one per line)</label>
+                        <textarea id="batchUrls" rows="4" placeholder="https://example.com&#10;https://example.org" style="width:100%;margin-bottom:0.5rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;padding:0.5rem;"></textarea>
+                        <label style="font-size:0.8rem;color:var(--text-muted);">Duration per URL (seconds)</label>
+                        <input type="number" id="batchDuration" value="30" min="5" max="300" style="width:100px;margin-bottom:0.5rem;">
+                        <button id="startBatchBtn" class="btn btn-primary btn-small">▶️ Start Batch</button>
+                        <div id="batchProgress" style="display:none;margin-top:0.5rem;padding:0.5rem;background:var(--bg-input);border-radius:6px;">
+                            <span id="batchCurrentNum">0</span> / <span id="batchTotalNum">0</span>
+                            <br><span id="batchCurrentUrl" style="font-size:0.8rem;color:var(--text-muted);">--</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Scheduled Recording -->
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enableSchedule">
+                        ⏰ Scheduled Recording
+                    </label>
+                    <div id="scheduleSection" style="display:none;margin-top:0.75rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);">URL</label>
+                        <input type="url" id="scheduleUrl" placeholder="https://example.com" style="width:100%;margin-bottom:0.5rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);">Date & Time</label>
+                        <input type="datetime-local" id="scheduleTime" style="width:100%;margin-bottom:0.5rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);">Duration (seconds)</label>
+                        <input type="number" id="scheduleDuration" value="60" min="5" max="3600" style="width:100px;margin-bottom:0.5rem;">
+                        <button id="addScheduleBtn" class="btn btn-primary btn-small">➕ Add Schedule</button>
+                        <div id="scheduleList" style="margin-top:0.5rem;max-height:150px;overflow-y:auto;"></div>
+                    </div>
+                </div>
                 <!-- Hidden trim inputs for backward compatibility -->
                 <input type="hidden" id="trimStart" value="0">
                 <input type="hidden" id="trimEnd" value="0">
