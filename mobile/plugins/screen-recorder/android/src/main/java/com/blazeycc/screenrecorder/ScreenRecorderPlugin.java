@@ -38,6 +38,11 @@ public class ScreenRecorderPlugin extends Plugin {
     private int screenHeight;
     private boolean isRecording = false;
 
+    // Recording options from startRecording call
+    private int optVideoBitrate = 8 * 1000 * 1000;
+    private int optFrameRate = 30;
+    private String optFormat = "mp4";
+
     @Override
     public void load() {
         projectionManager = (MediaProjectionManager) getContext().getSystemService(Context.MEDIA_PROJECTION_SERVICE);
@@ -55,8 +60,44 @@ public class ScreenRecorderPlugin extends Plugin {
             return;
         }
 
+        // Parse options
+        Integer bitrate = call.getInt("videoBitrate");
+        Integer fps = call.getInt("frameRate");
+        String format = call.getString("format");
+        String quality = call.getString("quality");
+
+        if (bitrate != null && bitrate > 0) {
+            optVideoBitrate = bitrate;
+        } else if (quality != null) {
+            optVideoBitrate = qualityToBitrate(quality);
+        } else {
+            optVideoBitrate = 8 * 1000 * 1000;
+        }
+
+        if (fps != null && fps > 0) {
+            optFrameRate = fps;
+        } else {
+            optFrameRate = 30;
+        }
+
+        if (format != null && (format.equals("mp4") || format.equals("webm"))) {
+            optFormat = format;
+        } else {
+            optFormat = "mp4";
+        }
+
         Intent intent = projectionManager.createScreenCaptureIntent();
         startActivityForResult(call, intent, REQUEST_CODE);
+    }
+
+    private int qualityToBitrate(String quality) {
+        switch (quality) {
+            case "low":    return 2_000_000;
+            case "medium": return 5_000_000;
+            case "high":   return 8_000_000;
+            case "ultra":  return 15_000_000;
+            default:       return 5_000_000;
+        }
     }
 
     @PluginMethod
@@ -70,9 +111,7 @@ public class ScreenRecorderPlugin extends Plugin {
         try {
             mediaRecorder.stop();
         } catch (RuntimeException e) {
-            // Stop called too quickly after start — no valid data
             Log.w(TAG, "RuntimeException on stop (no data recorded)", e);
-            // Delete the empty file
             try { new File(savedPath).delete(); } catch (Exception ignored) {}
             isRecording = false;
             cleanupRecorder();
@@ -145,19 +184,27 @@ public class ScreenRecorderPlugin extends Plugin {
 
     private void setupMediaRecorder() throws IOException {
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        // Use app-private external files dir to avoid scoped storage issues on Android 10+
         File dir = new File(getContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES), "Blazeycc");
         if (!dir.exists()) dir.mkdirs();
-        outputPath = new File(dir, "REC_" + timestamp + ".mp4").getAbsolutePath();
+
+        String ext = optFormat.equals("webm") ? ".webm" : ".mp4";
+        outputPath = new File(dir, "REC_" + timestamp + ext).getAbsolutePath();
 
         mediaRecorder = new MediaRecorder();
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+
+        if (optFormat.equals("webm")) {
+            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.WEBM);
+            mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.VP8);
+        } else {
+            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        }
+
         mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-        mediaRecorder.setVideoEncodingBitRate(8 * 1000 * 1000);
-        mediaRecorder.setVideoFrameRate(30);
+        mediaRecorder.setVideoEncodingBitRate(optVideoBitrate);
+        mediaRecorder.setVideoFrameRate(optFrameRate);
         mediaRecorder.setVideoSize(screenWidth, screenHeight);
         mediaRecorder.setOutputFile(outputPath);
         mediaRecorder.prepare();

@@ -1,8 +1,8 @@
 import { WebPlugin } from '@capacitor/core';
-import type { ScreenRecorderPlugin } from './definitions';
+import type { ScreenRecorderPlugin, RecordingOptions } from './definitions';
 
 export class ScreenRecorderWeb extends WebPlugin implements ScreenRecorderPlugin {
-  async startRecording(): Promise<{ started: boolean }> {
+  async startRecording(_options?: RecordingOptions): Promise<{ started: boolean }> {
     console.warn('ScreenRecorder: web fallback — use MediaRecorder API');
     return { started: false };
   }

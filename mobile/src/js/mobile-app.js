@@ -482,7 +482,19 @@ async function startRecording() {
     }
 
     try {
-        const result = await ScreenRecorder.startRecording();
+        // Map quality preset to bitrate
+        const qualityMap = { low: 2_000_000, medium: 5_000_000, high: 8_000_000, ultra: 15_000_000 };
+        const quality = elements.qualitySetting.value;
+        const videoBitrate = qualityMap[quality] || 5_000_000;
+        const frameRate = parseInt(elements.frameRateSelect.value) || 30;
+        const format = elements.outputFormat?.value || 'mp4';
+
+        const result = await ScreenRecorder.startRecording({
+            videoBitrate,
+            frameRate,
+            format,
+            quality
+        });
         if (!result.started) throw new Error('Failed to start');
 
         state.isRecording = true;
@@ -499,7 +511,7 @@ async function startRecording() {
 
         if (elements.autoZoomToggle.checked) injectAutoZoom();
 
-        showNotification('Recording started!', 'success');
+        showNotification(`Recording started (${frameRate} FPS, ${quality})`, 'success');
     } catch (error) {
         showNotification('Failed: ' + error.message, 'error');
     }
