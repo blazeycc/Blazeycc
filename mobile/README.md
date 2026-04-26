@@ -5,7 +5,7 @@ Capacitor-based mobile app for iOS and Android. Record your screen while browsin
 ## Architecture
 
 - **Web layer:** Existing HTML/CSS/JS adapted for mobile (touch-friendly, responsive)
-- **Native layer:** Custom Capacitor plugin using MediaProjection (Android) and ReplayKit (iOS)
+- **Native layer:** Custom Capacitor plugin using MediaProjection (Android)
 - **Recording:** Native screen capture, not canvas-based (mobile browsers don't allow canvas capture of cross-origin iframes)
 
 ## Prerequisites
